@@ -1,0 +1,105 @@
+#注意每个属性：（冒号）后要有一个空格
+server:
+  port: 8081
+  servlet:
+    session:
+      cookie:
+        name: AuthenticationServer #防止Cookie冲突，冲突会导致登录验证不通过
+        path: /  #将认证中心和各个子系统的Cookie设置在同一路径下，在认证中心登出时，将Cookie一并删除，实现认证中心和各个子系统的登出
+#  servlet:
+#    context-path: /auth#  servlet:
+#    context-path: /auth
+spring:
+  application:
+    name: AuthenticationServer
+  main:
+    allow-circular-references: true
+  thymeleaf:
+  #    view:
+  #      prefix: /
+  #      suffix: .html
+  # html
+  #   prefix: classpath:/templates/
+  #    #图片
+  #  resources:
+  #    static-locations: classpath:/
+
+  datasource:
+
+    #mysql
+    #具体参见类DynamicDataSourceAspect 说明
+    #不用此默认，默认就是写库,多数据源用jdbcUrl，不是url,spring 默认用的是url，用多数据源用url会报错。
+    url: jdbc:mysql://127.0.0.1:3306/demo?useUnicode=true&characterEncoding=utf8&useSSL=true&useJDBCCompliantTimezoneShift=true&useLegacyDatetimeCode=false&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 123456
+    #mysql 连接池8h自动断开配置
+    #    #验证连接的有效性
+    #    spring.datasource.test-while-idle=true
+    #    #获取连接时候验证，会影响性能
+    #    spring.datasource.test-on-borrow=true
+    #    spring.datasource.validation-query=SELECT 1 FROM DUAL
+    #    #空闲连接回收的时间间隔，与test-while-idle一起使用，设置5分钟
+    #    spring.datasource.time-between-eviction-runs-millis=300000
+    #    #连接池空闲连接的有效时间 ，设置30分钟
+    #    spring.datasource.min-evictable-idle-time-millis=1800000
+    #  spring-boot默认连接池
+    #  spring-boot中，根据以下3个优先级加载连接池
+    #  1）如果classpath中有HikariCP，优先选择它
+    #  2）如果Tomcat pooling 连接池可用，就会选择它
+    #  3）如果以上都没有，则会选择Commons DBCP2连接池
+    #    dbcp2:
+    #      test-on-borrow: true
+    #      validation-query: SELECT 1
+    #      time-between-eviction-runs-millis: 300000
+    #      min-evictable-idle-time-millis: 1800000
+    #      test-while-idle: true
+    # HikariCP： springboot2.0 默认的连接池。https://github.com/brettwooldridge/HikariCP
+    #HikariCP  高并发性能优。mysql 8h 空闲断开连接可用quartz 调度定期select 1  。
+    #产生此问题DB工作就不繁忙，性能要求不高。可以用上面dbcp2的配置，采取空闲查询策略。
+    #要引入mybatis
+    type: com.zaxxer.hikari.HikariDataSource
+    # Hikari will use the above plus the following to setup connection pooling
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 15
+      auto-commit: true
+      idle-timeout: 30000
+      #pool-name: HikariCP-Demo
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      #connection-test-query: SELECT 1
+  redis:
+    database: 3
+    host: 127.0.0.1
+    port: 6379
+    password: fancky123456
+
+
+
+##mybatis log 日志显示配置
+#mybatis-plus:
+#  configuration:
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+#代码中 MybatisPlusDataSourceConfig 配置会覆盖此配置
+mybatis-plus:
+  ##  mybatis全局配置文件
+  #  config-location: classpath:mybatis-config.xml
+  #  Mapper文件存放的位置，多了层文件夹，默认不用配置
+  mapper-locations: classpath:mapper/*.xml
+  #  实体类所在的包
+  type-aliases-package: com.fancky.authorization.entity
+  #  M_Str1  默认命中mStr1
+  configuration:
+    #下划线转驼峰,默认true
+    map-underscore-to-camel-case: false
+#    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 不配置由log4j2控制 ，会打印在控制台和日志  SQL脚本输出到控制台
+#    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl  #SQL脚本输出文件
+
+# JWT配置
+jwt:
+  secret: your-secret-key-must-be-at-least-32-characters-long-for-security-2024
+  access-token-expiration: 1800000  # 30分钟
+  refresh-token-expiration: 604800000  # 7天
+  token-prefix: Bearer
+  header: Authorization
