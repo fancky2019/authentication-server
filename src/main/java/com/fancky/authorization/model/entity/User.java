@@ -1,4 +1,4 @@
-package com.fancky.authorization.entity;
+package com.fancky.authorization.model.entity;
 
 
 import com.baomidou.mybatisplus.annotation.*;

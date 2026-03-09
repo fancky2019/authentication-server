@@ -6,9 +6,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 
-import com.fancky.authorization.entity.RegisterRequest;
-import com.fancky.authorization.entity.User;
-import com.fancky.authorization.entity.UserInfoVO;
+import com.fancky.authorization.model.request.RegisterRequest;
+import com.fancky.authorization.model.entity.User;
+import com.fancky.authorization.model.response.UserInfoVO;
 import com.fancky.authorization.mapper.UserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -1,7 +1,7 @@
 package com.fancky.authorization.service;
 
 
-import com.fancky.authorization.entity.User;
+import com.fancky.authorization.model.entity.User;
 import io.jsonwebtoken.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,7 +1,7 @@
 package com.fancky.authorization.filter;
 
 
-import com.fancky.authorization.entity.Result;
+import com.fancky.authorization.model.response.Result;
 import com.fancky.authorization.service.JwtService;
 import com.fancky.authorization.service.UserDetailsServiceImpl;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -106,11 +106,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         new WebAuthenticationDetailsSource().buildDetails(request)
                 );
 
+
                 SecurityContextHolder.getContext().setAuthentication(authToken);
+                //获取当前用户
+                Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+                if (principal instanceof UserDetails) {
+                    UserDetails userDetails1 = (UserDetails) principal;
+                } else {
+                    principal.toString();
+                }
 
                 log.debug("用户认证成功: {}, 权限: {}",
                         username, userDetails.getAuthorities());
-
+                //路由权限认证
+//                // 检查特定接口的权限
+//                if (!checkEndpointPermission(userDetails, requestURI, method)) {
+//                    log.warn("用户 {} 没有权限访问: {}", username, requestURI);
+//                    sendForbiddenResponse(response, "无权限访问");
+//                    return;
+//                }
                 filterChain.doFilter(request, response);
             } else {
                 // 验证失败，直接返回401

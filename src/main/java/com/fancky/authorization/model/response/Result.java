@@ -1,4 +1,4 @@
-package com.fancky.authorization.entity;
+package com.fancky.authorization.model.response;
 
 
 import lombok.Data;

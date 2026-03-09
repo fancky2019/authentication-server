@@ -4,9 +4,9 @@ package com.fancky.authorization.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.fancky.authorization.entity.RegisterRequest;
-import com.fancky.authorization.entity.User;
-import com.fancky.authorization.entity.UserInfoVO;
+import com.fancky.authorization.model.request.RegisterRequest;
+import com.fancky.authorization.model.entity.User;
+import com.fancky.authorization.model.response.UserInfoVO;
 
 
 import java.util.List;

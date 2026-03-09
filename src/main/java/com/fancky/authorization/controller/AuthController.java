@@ -1,12 +1,18 @@
 package com.fancky.authorization.controller;
 
 
-import com.fancky.authorization.entity.*;
+import com.fancky.authorization.model.entity.*;
+import com.fancky.authorization.model.request.ChangePasswordRequest;
+import com.fancky.authorization.model.request.RefreshTokenRequest;
+import com.fancky.authorization.model.request.RegisterRequest;
+import com.fancky.authorization.model.request.ResetPasswordRequest;
+import com.fancky.authorization.model.response.Result;
 import com.fancky.authorization.service.JwtService;
 import com.fancky.authorization.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
@@ -65,6 +71,8 @@ public class AuthController {
         }
     }
 
+
+
     /**
      * 登出的token 加入redis 黑名单
      * @param request
@@ -99,6 +107,19 @@ public class AuthController {
         }
 
         return Result.success(userService.convertToVO(user));
+    }
+
+    private String getCurrentUsername() {
+        try {
+            Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            if (principal instanceof UserDetails) {
+                return ((UserDetails) principal).getUsername();
+            } else {
+                return principal.toString();
+            }
+        } catch (Exception e) {
+            return "system";
+        }
     }
 
     @PostMapping("/changePassword")

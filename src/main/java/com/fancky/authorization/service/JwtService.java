@@ -1,7 +1,7 @@
 package com.fancky.authorization.service;
 
 
-import com.fancky.authorization.entity.User;
+import com.fancky.authorization.model.entity.User;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.servlet.http.HttpServletRequest;
