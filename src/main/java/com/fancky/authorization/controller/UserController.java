@@ -1,15 +1,11 @@
 package com.fancky.authorization.controller;
 
-
-
 import com.fancky.authorization.model.dto.UserDTO;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.model.response.Result;
 import com.fancky.authorization.service.SysUserService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -25,7 +21,6 @@ public class UserController {
      * 分页查询用户列表
      */
     @GetMapping("/page")
-    @PreAuthorize("hasAuthority('system:user:query')")
     public Result<PageVO<SysUser>> page(UserDTO userDTO) {
         PageVO<SysUser> page = userService.getUserPage(userDTO);
         return Result.success(page);
@@ -35,7 +30,6 @@ public class UserController {
      * 查询用户详情
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('system:user:query')")
     public Result<SysUser> getById(@PathVariable Long id) {
         SysUser user = userService.getById(id);
         return Result.success(user);
