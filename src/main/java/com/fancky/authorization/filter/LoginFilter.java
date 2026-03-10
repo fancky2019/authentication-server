@@ -4,9 +4,9 @@ package com.fancky.authorization.filter;
 import com.fancky.authorization.model.request.LoginRequest;
 import com.fancky.authorization.model.response.LoginResponse;
 import com.fancky.authorization.model.response.Result;
-import com.fancky.authorization.model.entity.User;
+import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.service.JwtService;
-import com.fancky.authorization.service.UserService;
+import com.fancky.authorization.service.SysUserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpMethod;
@@ -43,12 +43,12 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;
-    private final UserService userService;
+    private final SysUserService userService;
 
     public LoginFilter(AuthenticationManager authenticationManager,
                        JwtService jwtService,
                        ObjectMapper objectMapper,
-                       UserService userService) {
+                       SysUserService userService) {
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
         this.objectMapper = objectMapper;
@@ -115,7 +115,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
                                             Authentication authResult)
             throws IOException {
 
-        User user = (User) authResult.getPrincipal();
+        SysUser user = (SysUser) authResult.getPrincipal();
 
         userService.updateLastLoginTime(user.getUsername());
 

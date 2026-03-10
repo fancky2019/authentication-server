@@ -1,7 +1,7 @@
 package com.fancky.authorization.service;
 
 
-import com.fancky.authorization.model.entity.User;
+import com.fancky.authorization.model.entity.SysUser;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import javax.servlet.http.HttpServletRequest;
@@ -9,9 +9,9 @@ import java.util.Map;
 
 public interface JwtService {
 
-    String generateAccessToken(User user);
+    String generateAccessToken(SysUser user);
 
-    String generateRefreshToken(User user);
+    String generateRefreshToken(SysUser user);
 
     String getUsernameFromToken(String token);
 

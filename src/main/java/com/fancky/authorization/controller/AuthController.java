@@ -8,7 +8,7 @@ import com.fancky.authorization.model.request.RegisterRequest;
 import com.fancky.authorization.model.request.ResetPasswordRequest;
 import com.fancky.authorization.model.response.Result;
 import com.fancky.authorization.service.JwtService;
-import com.fancky.authorization.service.UserService;
+import com.fancky.authorization.service.SysUserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -26,7 +26,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final UserService userService;
+    private final SysUserService userService;
     private final JwtService jwtService;
 
     @PostMapping("/login")
@@ -100,7 +100,7 @@ public class AuthController {
         }
 
         String username = jwtService.getUsernameFromToken(token);
-        User user = userService.getUserWithRolesAndPermissions(username);
+        SysUser user = userService.getUserWithRolesAndPermissions(username);
 
         if (user == null) {
             return Result.error(404, "用户不存在");
@@ -187,7 +187,7 @@ public class AuthController {
         }
 
         String username = jwtService.getUsernameFromToken(token);
-        User user = userService.getUserWithRolesAndPermissions(username);
+        SysUser user = userService.getUserWithRolesAndPermissions(username);
 
         if (user == null) {
             return Result.error(401, "用户不存在");

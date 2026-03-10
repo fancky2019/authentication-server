@@ -1,7 +1,7 @@
 package com.fancky.authorization.service;
 
 
-import com.fancky.authorization.model.entity.User;
+import com.fancky.authorization.model.entity.SysUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,11 +15,10 @@ import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Autowired
-    private  UserService userService;
+    private  SysUserService sysUserService;
 
     /**
      * 登录时候会调用此方法
@@ -31,7 +30,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.debug("正在加载用户: {}", username);
 
-        User user = userService.getUserWithRolesAndPermissions(username);
+        SysUser user = sysUserService.getUserWithRolesAndPermissions(username);
 
         if (user == null) {
             log.warn("用户不存在: {}", username);

@@ -1,7 +1,9 @@
-package com.fancky.authorization.service;
+package com.fancky.authorization.service.impl;
 
 
-import com.fancky.authorization.model.entity.User;
+import com.fancky.authorization.model.entity.SysUser;
+import com.fancky.authorization.service.JwtService;
+import com.fancky.authorization.service.UserDetailsServiceImpl;
 import io.jsonwebtoken.*;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +39,7 @@ public class JwtServiceImpl implements JwtService {
     @Autowired
     private  StringRedisTemplate redisTemplate;
     @Autowired
-    private  UserDetailsServiceImpl userDetailsService;
+    private UserDetailsServiceImpl userDetailsService;
 
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
     private static final String REFRESH_PREFIX = "jwt:refresh:";
@@ -65,7 +67,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateAccessToken(User user) {
+    public String generateAccessToken(SysUser user) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("id", user.getId());
         claims.put("username", user.getUsername());
@@ -91,7 +93,7 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateRefreshToken(User user) {
+    public String generateRefreshToken(SysUser user) {
         String token = Jwts.builder()
                 .setSubject(user.getUsername())
                 .setId(UUID.randomUUID().toString())
@@ -201,7 +203,7 @@ public class JwtServiceImpl implements JwtService {
             }
 
             UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-            return generateAccessToken((User) userDetails);
+            return generateAccessToken((SysUser) userDetails);
 
         } catch (ExpiredJwtException e) {
             log.warn("刷新令牌已过期");

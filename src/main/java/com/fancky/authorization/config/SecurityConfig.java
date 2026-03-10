@@ -4,8 +4,8 @@ package com.fancky.authorization.config;
 import com.fancky.authorization.filter.JwtAuthenticationFilter;
 import com.fancky.authorization.filter.LoginFilter;
 import com.fancky.authorization.service.JwtService;
+import com.fancky.authorization.service.SysUserService;
 import com.fancky.authorization.service.UserDetailsServiceImpl;
-import com.fancky.authorization.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
@@ -47,7 +47,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     private ObjectMapper objectMapper;
 
     @Autowired
-    private UserService userService;
+    private SysUserService userService;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
