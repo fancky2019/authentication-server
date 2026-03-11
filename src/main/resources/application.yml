@@ -104,3 +104,8 @@ jwt:
   refresh-token-expiration: 604800000  # 7天
   token-prefix: Bearer
   header: Authorization
+
+
+
+logging:
+  config: classpath:log4j2.xml

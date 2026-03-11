@@ -20,7 +20,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_user")
 public class SysUser extends BaseEntity implements UserDetails {
-    @TableField("role_code")
+//    @TableField("role_code")
     private String username;
 
     @JsonIgnore
@@ -44,13 +44,9 @@ public class SysUser extends BaseEntity implements UserDetails {
 //
 //    private Integer credentialsNonExpired;
 
+    @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime lastLoginTime;
-
-    private String deleteBy;
-
-    private LocalDateTime deleteTime;
-
 
     @TableField(exist = false)
     private List<SysDept> depts;
