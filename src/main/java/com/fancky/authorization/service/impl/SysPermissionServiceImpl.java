@@ -8,10 +8,12 @@ import com.fancky.authorization.model.dto.PermissionDTO;
 import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.service.SysPermissionService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -35,6 +37,16 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Override
     public List<SysPermission> getUserPermissions(Long userId) {
         return permissionMapper.selectUserPermissions(userId);
+    }
+
+    @Override
+    public List<SysPermission> getPermissions(List<Long> idList) {
+        if (CollectionUtils.isEmpty(idList)) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<SysPermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.in(SysPermission::getId, idList);
+        return this.list(lambdaQueryWrapper);
     }
 
     @Override

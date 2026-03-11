@@ -54,12 +54,6 @@ public class SysDept extends BaseEntity {
      */
     private Integer sort;
 
-    /**
-     * 逻辑删除字段
-     */
-    private String deleteBy;
-
-    private LocalDateTime deleteTime;
 
     /**
      * 子部门列表（用于树形结构）

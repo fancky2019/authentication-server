@@ -2,8 +2,10 @@ package com.fancky.authorization.service;
 
 
 import com.fancky.authorization.model.entity.SysUser;
+import com.fancky.authorization.model.entity.SysUserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -18,7 +20,7 @@ import java.util.List;
 public class UserDetailsServiceImpl implements UserDetailsService {
 
     @Autowired
-    private  SysUserService sysUserService;
+    private SysUserService sysUserService;
 
     /**
      * 登录时候会调用此方法
@@ -42,11 +44,11 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             throw new UsernameNotFoundException("用户已被禁用: " + username);
         }
 
-        List<String> roles=new ArrayList<>();
+        List<String> roles = new ArrayList<>();
         roles.add("roles1");
         roles.add("roles2");
         roles.add("roles3");
-        List<String> permissions=new ArrayList<>();
+        List<String> permissions = new ArrayList<>();
         permissions.add("permissions1");
         permissions.add("permissions2");
         permissions.add("permissions3");

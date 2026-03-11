@@ -20,7 +20,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_user")
 public class SysUser extends BaseEntity implements UserDetails {
-
+    @TableField("role_code")
     private String username;
 
     @JsonIgnore

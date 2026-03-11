@@ -14,12 +14,16 @@ import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysRoleService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -56,6 +60,43 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                     .collect(Collectors.toList()));
         }
         return role;
+    }
+
+    @Override
+    public SysRole getRoleByCode(String code) throws Exception {
+        LambdaQueryWrapper<SysRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(SysRole::getRoleCode, code);
+        List<SysRole> sysRoles = this.list(lambdaQueryWrapper);
+        if (CollectionUtils.isEmpty(sysRoles)) {
+            throw new Exception("Can't get role info by code: " + code);
+        }
+        if (sysRoles.size() > 1) {
+            throw new Exception("Get multiple role info by code: " + code);
+        }
+        return sysRoles.get(0);
+    }
+
+    @Override
+    public List<SysRole> getRoleByIds(List<Long> idList) throws Exception {
+        LambdaQueryWrapper<SysRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.in(SysRole::getId, idList);
+        List<SysRole> sysRoles = this.list(lambdaQueryWrapper);
+        String idStr = org.apache.commons.lang3.StringUtils.join(idList, ",");
+        if (CollectionUtils.isEmpty(sysRoles)) {
+            throw new Exception("Can't get role info by code: " + idStr);
+        }
+
+        List<Long> dbIds = sysRoles.stream()
+                .map(SysRole::getId)
+                .collect(Collectors.toList());
+
+        List<Long> notExistIds = new ArrayList<>(idList);
+        notExistIds.removeAll(dbIds);
+
+        if (!notExistIds.isEmpty()) {
+            throw new Exception("Role id not exist: " + idStr);
+        }
+        return sysRoles;
     }
 
     @Override

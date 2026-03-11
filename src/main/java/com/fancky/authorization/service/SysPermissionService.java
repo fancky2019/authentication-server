@@ -21,6 +21,11 @@ public interface SysPermissionService extends IService<SysPermission> {
     List<SysPermission> getUserPermissions(Long userId);
 
     /**
+     * 获取用户权限
+     */
+    List<SysPermission> getPermissions(List<Long> idList);
+
+    /**
      * 新增权限
      */
     boolean addPermission(PermissionDTO permissionDTO);

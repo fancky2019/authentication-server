@@ -7,22 +7,35 @@ import com.fancky.authorization.mapper.SysRolePermissionMapper;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.service.SysRolePermissionService;
 import lombok.RequiredArgsConstructor;
+import org.apache.commons.collections4.CollectionUtils;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionMapper, SysRolePermission>
         implements SysRolePermissionService {
 
-    private final SysRolePermissionMapper rolePermissionMapper;
+    @Autowired
+    private SysRolePermissionMapper rolePermissionMapper;
 
     @Override
     public List<Long> getPermissionIdsByRoleId(Long roleId) {
         return rolePermissionMapper.selectPermissionIdsByRoleId(roleId);
+    }
+
+    @Override
+    public List<SysRolePermission> getPermissionsByRoleIds(List<Long> roleIdList) {
+        if (CollectionUtils.isEmpty(roleIdList)) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.in(SysRolePermission::getRoleId, roleIdList);
+        return this.list(lambdaQueryWrapper);
     }
 
     @Override

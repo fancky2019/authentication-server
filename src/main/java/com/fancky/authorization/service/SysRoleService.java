@@ -5,6 +5,8 @@ import com.fancky.authorization.model.dto.RoleDTO;
 import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.response.PageVO;
 
+import java.util.List;
+
 
 public interface SysRoleService extends IService<SysRole> {
 
@@ -17,6 +19,16 @@ public interface SysRoleService extends IService<SysRole> {
      * 查询角色详情（包含权限）
      */
     SysRole getRoleWithPermissions(Long id);
+
+    /**
+     *
+     */
+    SysRole getRoleByCode(String code) throws Exception;
+
+    /**
+     *
+     */
+    List<SysRole> getRoleByIds(List<Long> idList) throws Exception;
 
     /**
      * 新增角色

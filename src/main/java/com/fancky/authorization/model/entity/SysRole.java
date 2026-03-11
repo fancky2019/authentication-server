@@ -13,20 +13,17 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_role")
 public class SysRole extends BaseEntity {
-
+    @TableField("role_code")
     private String roleCode;
-
+    @TableField("role_name")
     private String roleName;
-
+    @TableField("role_sort")
     private Integer roleSort;
-
+    @TableField("data_scope")
     private Integer dataScope;
-
+    @TableField("status")
     private Integer status;
 
-    private String deleteBy;
-
-    private LocalDateTime deleteTime;
 
     @TableField(exist = false)
     private List<SysPermission> permissions;

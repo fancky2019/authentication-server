@@ -13,6 +13,8 @@ public interface SysRolePermissionService extends IService<SysRolePermission> {
      */
     List<Long> getPermissionIdsByRoleId(Long roleId);
 
+    List<SysRolePermission> getPermissionsByRoleIds(List<Long> roleIdList);
+
     /**
      * 根据权限ID获取角色ID列表
      */

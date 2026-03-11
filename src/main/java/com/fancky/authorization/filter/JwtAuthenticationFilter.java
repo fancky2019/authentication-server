@@ -1,13 +1,18 @@
 package com.fancky.authorization.filter;
 
 
+import com.fancky.authorization.model.entity.*;
 import com.fancky.authorization.model.response.Result;
-import com.fancky.authorization.service.JwtService;
-import com.fancky.authorization.service.UserDetailsServiceImpl;
+import com.fancky.authorization.service.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sun.org.apache.bcel.internal.generic.RETURN;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.bouncycastle.jce.exception.ExtException;
+import org.bouncycastle.jce.exception.ExtIOException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,6 +29,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * UsernamePasswordAuthenticationFilter	 处理登录认证 	/login
@@ -38,6 +45,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private UserDetailsServiceImpl userDetailsService;
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private SysUserRoleService sysUserRoleService;
+
+    @Autowired
+    private SysRoleService sysRoleService;
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @Autowired
+    private SysRolePermissionService sysRolePermissionService;
+    @Autowired
+    private SysPermissionService sysPermissionService;
 
 //    private final JwtService jwtService;
 //    private final UserDetailsServiceImpl userDetailsService;
@@ -107,6 +128,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 );
 
 
+                //设置用户信息
                 SecurityContextHolder.getContext().setAuthentication(authToken);
                 //获取当前用户
                 Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -125,6 +147,44 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 //                    sendForbiddenResponse(response, "无权限访问");
 //                    return;
 //                }
+                SysUser sysUser = sysUserService.getUserByUsername(userDetails.getUsername());
+                if (sysUser == null) {
+                    throw new Exception("用户不存在");
+                }
+                List<SysUserRole> userRoles = sysUserRoleService.getUserRoles(sysUser.getId());
+                if (CollectionUtils.isEmpty(userRoles)) {
+                    sendForbiddenResponse(response, "用户没有角色信息");
+                    return;
+                }
+                String superAdmin = "ROLE_SUPER_ADMIN";
+
+
+                List<Long> roleIdList = userRoles.stream().map(p -> p.getRoleId()).distinct().collect(Collectors.toList());
+
+                List<SysRole> sysRoleList = this.sysRoleService.getRoleByIds(roleIdList);
+                List<String> sysRoleCodeList = sysRoleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
+                if (sysRoleCodeList.contains(superAdmin)) {
+
+                } else {
+                    //  /authentication-server/api/auth/getCurrentUser
+                    String requestURI = request.getRequestURI();
+                    // /api/auth/getCurrentUser
+                    String servletPath = request.getServletPath();
+                    List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+                    if (CollectionUtils.isEmpty(sysRolePermissionList)) {
+                        sendForbiddenResponse(response, "用户没有角色权限信息");
+                    }
+                    List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
+                    List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
+                    if (CollectionUtils.isEmpty(permissionList)) {
+                        sendForbiddenResponse(response, "用户没有权限信息");
+                    }
+                    List<String> pathList = permissionList.stream().filter(p-> StringUtils.isNotEmpty(p.getPath())).map(p -> p.getPath()).distinct().collect(Collectors.toList());
+                    if (!pathList.contains(servletPath)) {
+                        sendForbiddenResponse(response, "用户该权限");
+                    }
+                }
+                //验证通过
                 filterChain.doFilter(request, response);
             } else {
                 // 验证失败，直接返回401
@@ -159,6 +219,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         PrintWriter writer = response.getWriter();
         writer.write(objectMapper.writeValueAsString(
                 Result.error(401, message)
+        ));
+        writer.flush();
+    }
+
+    /**
+     * 发送401未授权响应
+     */
+    private void sendForbiddenResponse(HttpServletResponse response, String message)
+            throws IOException {
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        response.setCharacterEncoding("UTF-8");
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+
+        PrintWriter writer = response.getWriter();
+        writer.write(objectMapper.writeValueAsString(
+                Result.error(403, message)
         ));
         writer.flush();
     }

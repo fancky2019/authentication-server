@@ -433,3 +433,9 @@ VALUES ('web_client', 'Web客户端', '$2a$10$rqX7QyQyQyQyQyQyQyQyQ', 1, 'passwo
 
 INSERT INTO sys_client (client_id, client_name, client_secret, client_type, grant_types, redirect_uri, scope, access_token_validity, refresh_token_validity, status, remark, version) 
 VALUES ('app_client', 'APP客户端', '$2a$10$rqX7QyQyQyQyQyQyQyQyQ', 2, 'password,refresh_token', 'app://callback', 'basic', 7200, 2592000, 1, '移动应用客户端', 1);
+
+select  *  from sys_user_role
+select  *  from  sys_role
+select  *  from  sys_permission
+select  *  from  sys_role_permission
+select  *  from sys_user
