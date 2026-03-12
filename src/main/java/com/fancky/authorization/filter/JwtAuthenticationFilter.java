@@ -138,8 +138,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     principal.toString();
                 }
 
-                log.debug("用户认证成功: {}, 权限: {}",
-                        username, userDetails.getAuthorities());
+                log.debug("用户认证成功: {}, 权限: {}", username, userDetails.getAuthorities());
                 //路由权限认证
 //                // 检查特定接口的权限
 //                if (!checkEndpointPermission(userDetails, requestURI, method)) {
@@ -147,7 +146,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 //                    sendForbiddenResponse(response, "无权限访问");
 //                    return;
 //                }
-                SysUser sysUser = sysUserService.getUserByUsername(userDetails.getUsername());
+                String userName=userDetails.getUsername();
+//                userName="12";
+                SysUser sysUser = sysUserService.getUserByUsername(userName);
                 if (sysUser == null) {
                     throw new Exception("用户不存在");
                 }
@@ -173,15 +174,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
                     if (CollectionUtils.isEmpty(sysRolePermissionList)) {
                         sendForbiddenResponse(response, "用户没有角色权限信息");
+                        return;
                     }
                     List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
                     List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
                     if (CollectionUtils.isEmpty(permissionList)) {
                         sendForbiddenResponse(response, "用户没有权限信息");
+                        return;
                     }
-                    List<String> pathList = permissionList.stream().filter(p-> StringUtils.isNotEmpty(p.getPath())).map(p -> p.getPath()).distinct().collect(Collectors.toList());
+                    List<String> pathList = permissionList.stream().filter(p -> StringUtils.isNotEmpty(p.getPath())).map(p -> p.getPath()).distinct().collect(Collectors.toList());
                     if (!pathList.contains(servletPath)) {
-                        sendForbiddenResponse(response, "用户该权限");
+                        sendForbiddenResponse(response, "用户没有该权限");
+                        return;
                     }
                 }
                 //验证通过

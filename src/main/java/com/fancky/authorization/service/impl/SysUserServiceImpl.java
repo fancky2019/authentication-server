@@ -1,4 +1,4 @@
-package com.fancky.authorization.service;
+package com.fancky.authorization.service.impl;
 
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -14,45 +14,103 @@ import com.fancky.authorization.model.entity.SysUserRole;
 import com.fancky.authorization.model.request.RegisterRequest;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.model.response.UserInfoVO;
-import lombok.RequiredArgsConstructor;
+import com.fancky.authorization.service.SysUserService;
+import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.RedisUtil;
+import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisCallback;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
+
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
 
     @Autowired
-    private  SysUserMapper sysUserMapper;
+    private SysUserMapper sysUserMapper;
     @Autowired
-    private  SysUserRoleMapper userRoleMapper;
+    private SysUserRoleMapper userRoleMapper;
     @Autowired
-    private  PasswordEncoder passwordEncoder;
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private RedisTemplate redisTemplate;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @Autowired
+    private RedisUtil redisUtil;
+
+    @Autowired
+    private RedisCacheService redisCacheService;
+
 
     @Override
-    public SysUser getUserByUsername(String username) {
-        return sysUserMapper.selectUserByUsername(username);
+    public SysUser getUserByUsername(String username) throws Exception {
+        if (StringUtils.isEmpty(username)) {
+            return null;
+        }
+        username = username.trim();
+        String code = username;
+        return redisCacheService.<SysUser>builder()
+                .primary(RedisKey.USER_CODE_KEY, code)
+                .nullCache(RedisKey.USER_CODE_NULL_PREFIX + code)
+                .db(() -> sysUserMapper.selectUserByUsername(code), SysUser.class)
+                .secondaryCache(                                      // 二级缓存：id -> user
+                        RedisKey.USER_KEY,
+                        user -> String.valueOf(user.getId())
+                )
+//                .withAdditionalCache(user -> {                        // 额外的缓存逻辑
+//                    log.info("User {} cached successfully", code);
+//                    // 可以在这里添加其他缓存操作，比如记录缓存时间等
+//                })
+//                .nullCacheTimeout(5, TimeUnit.MINUTES)               // 空值缓存5分钟
+                .execute();
     }
+
+    @Override
+    public SysUser getUserById(Long id) throws Exception {
+        if (id == null || id <= 0) {
+            return null;
+        }
+        String idStr = id.toString();
+        return redisCacheService.<SysUser>builder()
+                .primary(RedisKey.USER_KEY, idStr)
+                .nullCache(RedisKey.USER_NULL_PREFIX + idStr)
+                .db(() -> this.getById(id), SysUser.class)
+                .secondaryCache(RedisKey.USER_CODE_KEY, SysUser::getUsername)
+                .nullCacheTimeout(1, TimeUnit.MINUTES)
+                .execute();
+    }
+
 
     @Override
     public PageVO<SysUser> getUserPage(UserDTO userDTO) {
         Page<SysUser> page = new Page<>(userDTO.getCurrent(), userDTO.getSize());
 
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(StringUtils.hasText(userDTO.getUsername()), SysUser::getUsername, userDTO.getUsername())
-                .like(StringUtils.hasText(userDTO.getNickname()), SysUser::getNickname, userDTO.getNickname())
-                .like(StringUtils.hasText(userDTO.getPhone()), SysUser::getPhone, userDTO.getPhone())
+        wrapper.like(StringUtils.isNotEmpty(userDTO.getUsername()), SysUser::getUsername, userDTO.getUsername())
+                .like(StringUtils.isNotEmpty(userDTO.getNickname()), SysUser::getNickname, userDTO.getNickname())
+                .like(StringUtils.isNotEmpty(userDTO.getPhone()), SysUser::getPhone, userDTO.getPhone())
                 .eq(userDTO.getGender() != null, SysUser::getGender, userDTO.getGender())
                 .eq(userDTO.getEnabled() != null, SysUser::isEnabled, userDTO.getEnabled())
                 .orderByDesc(SysUser::getCreateTime);
@@ -80,9 +138,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         user.setPhone(userDTO.getPhone());
         user.setGender(userDTO.getGender());
         user.setEnabled(true);
-        user.setAccountNonExpired(1);
-        user.setAccountNonLocked(1);
-        user.setCredentialsNonExpired(1);
+        user.setAccountNonExpired(true);
+        user.setAccountNonLocked(true);
+        user.setCredentialsNonExpired(true);
 
         int insert = sysUserMapper.insert(user);
 
@@ -108,7 +166,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         user.setPhone(userDTO.getPhone());
         user.setGender(userDTO.getGender());
 
-        if (StringUtils.hasText(userDTO.getPassword())) {
+        if (StringUtils.isNotEmpty(userDTO.getPassword())) {
             user.setPassword(passwordEncoder.encode(userDTO.getPassword()));
         }
 
@@ -153,7 +211,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public boolean updateStatus(Long id, Integer enabled) {
         SysUser user = new SysUser();
         user.setId(id);
-        user.setEnabled(enabled==1);
+        user.setEnabled(enabled == 1);
         return sysUserMapper.updateById(user) > 0;
     }
 
@@ -186,8 +244,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
 
-
-
     @Override
     public SysUser getUserWithRolesAndPermissions(String username) {
         log.debug("查询用户信息: {}", username);
@@ -207,7 +263,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         // 检查邮箱
-        if (StringUtils.hasText(registerRequest.getEmail())) {
+        if (StringUtils.isNotEmpty(registerRequest.getEmail())) {
             wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(SysUser::getEmail, registerRequest.getEmail());
             if (this.count(wrapper) > 0) {
@@ -216,7 +272,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         // 检查手机号
-        if (StringUtils.hasText(registerRequest.getPhone())) {
+        if (StringUtils.isNotEmpty(registerRequest.getPhone())) {
             wrapper = new LambdaQueryWrapper<>();
             wrapper.eq(SysUser::getPhone, registerRequest.getPhone());
             if (this.count(wrapper) > 0) {
@@ -280,7 +336,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public IPage<SysUser> getUserPage(Page<SysUser> page, String keyword) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
 
-        if (StringUtils.hasText(keyword)) {
+        if (StringUtils.isNotEmpty(keyword)) {
             wrapper.and(w -> w
                     .like(SysUser::getUsername, keyword)
                     .or()

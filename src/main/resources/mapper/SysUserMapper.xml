@@ -24,21 +24,22 @@
         <result property="updateBy" column="update_by"/>
         <result property="updateTime" column="update_time"/>
         <result property="remark" column="remark"/>
-        <collection property="roles" ofType="com.fancky.authorization.model.entity.SysRole">
-            <id property="id" column="role_id"/>
-            <result property="roleCode" column="role_code"/>
-            <result property="roleName" column="role_name"/>
-            <result property="status" column="role_status"/>
-        </collection>
+<!--        <collection property="roles" ofType="com.fancky.authorization.model.entity.SysRole">-->
+<!--            <id property="id" column="role_id"/>-->
+<!--            <result property="roleCode" column="role_code"/>-->
+<!--            <result property="roleName" column="role_name"/>-->
+<!--            <result property="status" column="role_status"/>-->
+<!--        </collection>-->
     </resultMap>
 
     <select id="selectUserByUsername" resultMap="userResultMap">
         SELECT
-            u.*,
-            r.id as role_id,
-            r.role_code,
-            r.role_name,
-            r.status as role_status
+            u.*
+--                ,
+--             r.id as role_id,
+--             r.role_code,
+--             r.role_name,
+--             r.status as role_status
         FROM sys_user u
                  LEFT JOIN sys_user_role ur ON u.id = ur.user_id AND ur.deleted = 0
                  LEFT JOIN sys_role r ON ur.role_id = r.id AND r.deleted = 0

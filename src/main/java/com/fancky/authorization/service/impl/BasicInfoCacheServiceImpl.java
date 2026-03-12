@@ -4,17 +4,13 @@ import com.fancky.authorization.model.entity.*;
 import com.fancky.authorization.service.*;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.CollectionUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.ApplicationContext;
-import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.*;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
 
@@ -69,13 +65,6 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
 
 
 
-
-    public static final String USER_PREFIX = "BasicInfo:User";
-    public static final String ROLE_PREFIX = "BasicInfo:Role";
-    public static final String USER_ROLE_PREFIX = "BasicInfo:UserRole";
-    public static final String PERMISSION_PREFIX = "BasicInfo:Permission";
-    public static final String ROLE_PERMISSION_PREFIX = "BasicInfo:RolePermission";
-
     public static final int EMPTY_VALUE_EXPIRE_TIME = 5;
     //
 //    // 缓存前缀
@@ -94,14 +83,19 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
     @Override
     public void initUser() {
         log.info("start init User");
-        redisTemplate.delete(USER_PREFIX);
+        redisTemplate.delete(RedisKey.USER_KEY);
         log.info("delete User complete");
         List<SysUser> list = this.sysUserService.list();
 
         Map<String, SysUser> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
         //redis key  都是string
         HashOperations<String, String, SysUser> hashOps = redisTemplate.opsForHash();
-        hashOps.putAll(USER_PREFIX, map);
+        hashOps.putAll(RedisKey.USER_KEY, map);
+
+        Map<String, SysUser> codeKeyMap = list.stream().collect(Collectors.toMap(p -> p.getUsername(), p -> p));
+        //redis key  都是string
+        hashOps.putAll(RedisKey.USER_CODE_KEY, codeKeyMap);
+
         log.info("init location complete");
     }
 
@@ -109,22 +103,22 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
     @Override
     public void initRole() {
         log.info("start init Role");
-        redisTemplate.delete(ROLE_PREFIX);
+        redisTemplate.delete(RedisKey.ROLE_KEY);
         log.info("delete Role complete");
         List<SysRole> list = this.sysRoleService.list();
         Map<String, SysRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(ROLE_PREFIX, map);
+        redisTemplate.opsForHash().putAll(RedisKey.ROLE_KEY, map);
         log.info("init Role complete");
     }
 
     @Override
     public void initUserRole() {
         log.info("start init UserRole");
-        redisTemplate.delete(USER_ROLE_PREFIX);
+        redisTemplate.delete(RedisKey.USER_ROLE_KEY);
         log.info("delete UserRole complete");
         List<SysUserRole> list = this.sysUserRoleService.list();
         Map<String, SysUserRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(USER_ROLE_PREFIX, map);
+        redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_KEY, map);
         log.info("init UserRole complete");
     }
 
@@ -132,22 +126,22 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
     @Override
     public void initUserPermission() {
         log.info("start init Permission");
-        redisTemplate.delete(PERMISSION_PREFIX);
+        redisTemplate.delete(RedisKey.PERMISSION_KEY);
         log.info("delete Permission complete");
         List<SysPermission> list = this.sysPermissionService.list();
         Map<String, SysPermission> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(PERMISSION_PREFIX, map);
+        redisTemplate.opsForHash().putAll(RedisKey.PERMISSION_KEY, map);
         log.info("init Permission complete");
     }
 
     @Override
     public void initUserRolePermission() {
         log.info("start init RolePermission");
-        redisTemplate.delete(ROLE_PERMISSION_PREFIX);
+        redisTemplate.delete(RedisKey.ROLE_PERMISSION_KEY);
         log.info("delete RolePermission complete");
         List<SysRolePermission> list = this.sysRolePermissionService.list();
         Map<String, SysRolePermission> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(ROLE_PERMISSION_PREFIX, map);
+        redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_KEY, map);
         log.info("init RolePermission complete");
     }
 

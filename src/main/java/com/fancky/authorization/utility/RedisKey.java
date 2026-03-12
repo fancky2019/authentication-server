@@ -31,4 +31,38 @@ public class RedisKey {
     public static  final  String KEY_LOCK_SUFFIX=":operation";
     public static  final  String MQ_FAIL_HANDLER="mqFailHandler:mqOperation";
     public static  final  String MQ_FAIL_HANDLER_TIME="mqFailHandler:latestExecutingTime";
+
+
+    public  static Integer TIME_OUT_HALF_MINUTE=60;
+    public  static Integer TIME_OUT_ONE_MINUTE=60;
+    //__NULL__
+    public static final String EMPTY_VALUE = "__NULL__";
+
+    public static final String REDISSON_PREFIX = "Redisson:";
+    //region sys
+    public static final String USER_KEY = "BasicInfo:User";
+    public static final String USER_CODE_KEY = "BasicInfo:User:Code";
+    //string
+    public static final String USER_PREFIX = "BasicInfo:User:";
+    public static final String USER_NULL_PREFIX = "BasicInfo:User:Null:";
+    public static final String USER_CODE_NULL_PREFIX = "BasicInfo:User:Code:Null:";
+
+
+    public static final String ROLE_KEY = "BasicInfo:Role";
+    public static final String USER_ROLE_KEY = "BasicInfo:UserRole";
+    public static final String PERMISSION_KEY = "BasicInfo:Permission";
+    public static final String ROLE_PERMISSION_KEY = "BasicInfo:RolePermission";
+
+    //endregion
+
+
+
+
+
+
+
+
+
+
+
 }

@@ -19,8 +19,8 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 根据用户名查询用户
      */
-    SysUser getUserByUsername(String username);
-
+    SysUser getUserByUsername(String username) throws Exception;
+    SysUser getUserById(Long id) throws Exception;
     /**
      * 分页查询用户列表
      */

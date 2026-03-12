@@ -57,6 +57,7 @@ public class SysUser extends BaseEntity implements UserDetails {
 
     @TableField(exist = false)
     private List<String> permissions = new ArrayList<>();
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         List<GrantedAuthority> authorities = new ArrayList<>();
@@ -80,31 +81,30 @@ public class SysUser extends BaseEntity implements UserDetails {
     @Getter(AccessLevel.NONE)
     @Setter
     @TableField("account_non_expired")
-    private Integer accountNonExpired = 1;
+    private Boolean accountNonExpired = true;
 
     @Getter(AccessLevel.NONE)
     @Setter
     @TableField("account_non_locked")
-    private Integer accountNonLocked = 1;
+    private Boolean accountNonLocked = true;
 
     @Getter(AccessLevel.NONE)
     @Setter
     @TableField("credentials_non_expired")
-    private Integer credentialsNonExpired = 1;
-
+    private Boolean credentialsNonExpired = true;
     @Override
     public boolean isAccountNonExpired() {
-        return accountNonExpired == 1;
+        return accountNonExpired ;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return accountNonLocked == 1;
+        return accountNonLocked ;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return credentialsNonExpired == 1;
+        return credentialsNonExpired ;
     }
 
     @Override

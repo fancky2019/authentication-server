@@ -75,6 +75,8 @@ public class RedisConfig {
 
         //使用jasckson 配置
         StringRedisSerializer stringRedisSerializer = new StringRedisSerializer();
+//        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+
         //jackson 序列化器
         // key采用String的序列化方式
         template.setKeySerializer(stringRedisSerializer);

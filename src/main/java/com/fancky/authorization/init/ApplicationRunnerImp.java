@@ -33,14 +33,10 @@ public class ApplicationRunnerImp implements ApplicationRunner {
     private BasicInfoCacheService basicInfoCacheService;
 
 
-
     @Override
     public void run(ApplicationArguments args) throws Exception {
-
         LOGGER.info("ApplicationRunnerImp");
-
-            basicInfoCacheService.initBasicInfoCache();
-
+//        basicInfoCacheService.initBasicInfoCache();
         log.info("ApplicationRunnerImp Complete");
 
     }
