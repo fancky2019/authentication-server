@@ -29,6 +29,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -162,6 +163,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 List<Long> roleIdList = userRoles.stream().map(p -> p.getRoleId()).distinct().collect(Collectors.toList());
 
+//                List<Long> idList1= Arrays.asList(99L);
                 List<SysRole> sysRoleList = this.sysRoleService.getRoleByIds(roleIdList);
                 List<String> sysRoleCodeList = sysRoleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
                 if (sysRoleCodeList.contains(superAdmin)) {

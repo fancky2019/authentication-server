@@ -23,7 +23,7 @@ import javax.annotation.Resource;
 @Order(1)
 @Slf4j
 public class ApplicationRunnerImp implements ApplicationRunner {
-    private static Logger LOGGER = LogManager.getLogger(ApplicationRunnerImp.class);
+//    private static Logger LOGGER = LogManager.getLogger(ApplicationRunnerImp.class);
 
 
     @Resource
@@ -35,7 +35,7 @@ public class ApplicationRunnerImp implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
-        LOGGER.info("ApplicationRunnerImp");
+        log.info("ApplicationRunnerImp");
 //        basicInfoCacheService.initBasicInfoCache();
         log.info("ApplicationRunnerImp Complete");
 

@@ -13,20 +13,21 @@ import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysRoleService;
+import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> implements SysRoleService {
 
@@ -34,14 +35,16 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     private SysRoleMapper roleMapper;
     @Autowired
     private SysRolePermissionMapper rolePermissionMapper;
+    @Autowired
+    private RedisCacheService redisCacheService;
 
     @Override
     public PageVO<SysRole> getRolePage(RoleDTO roleDTO) {
         Page<SysRole> page = new Page<>(roleDTO.getCurrent(), roleDTO.getSize());
 
         LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
-        wrapper.like(StringUtils.hasText(roleDTO.getRoleCode()), SysRole::getRoleCode, roleDTO.getRoleCode())
-                .like(StringUtils.hasText(roleDTO.getRoleName()), SysRole::getRoleName, roleDTO.getRoleName())
+        wrapper.like(StringUtils.isNotEmpty(roleDTO.getRoleCode()), SysRole::getRoleCode, roleDTO.getRoleCode())
+                .like(StringUtils.isNotEmpty(roleDTO.getRoleName()), SysRole::getRoleName, roleDTO.getRoleName())
                 .eq(roleDTO.getStatus() != null, SysRole::getStatus, roleDTO.getStatus())
                 .orderByAsc(SysRole::getRoleSort);
 
@@ -76,27 +79,81 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         return sysRoles.get(0);
     }
 
+//    @Override
+//    public List<SysRole> getRoleByIds(List<Long> idList) throws Exception {
+//
+//
+//
+//        LambdaQueryWrapper<SysRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+//        lambdaQueryWrapper.in(SysRole::getId, idList);
+//        List<SysRole> sysRoles = this.list(lambdaQueryWrapper);
+//        String idStr = org.apache.commons.lang3.StringUtils.join(idList, ",");
+//        if (CollectionUtils.isEmpty(sysRoles)) {
+//            throw new Exception("Can't get role info by code: " + idStr);
+//        }
+//
+//        List<Long> dbIds = sysRoles.stream()
+//                .map(SysRole::getId)
+//                .collect(Collectors.toList());
+//
+//        List<Long> notExistIds = new ArrayList<>(idList);
+//        notExistIds.removeAll(dbIds);
+//
+//        if (!notExistIds.isEmpty()) {
+//            throw new Exception("Role id not exist: " + idStr);
+//        }
+//        return sysRoles;
+//    }
+
     @Override
-    public List<SysRole> getRoleByIds(List<Long> idList) throws Exception {
-        LambdaQueryWrapper<SysRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.in(SysRole::getId, idList);
-        List<SysRole> sysRoles = this.list(lambdaQueryWrapper);
-        String idStr = org.apache.commons.lang3.StringUtils.join(idList, ",");
-        if (CollectionUtils.isEmpty(sysRoles)) {
-            throw new Exception("Can't get role info by code: " + idStr);
+    public List<SysRole> getRoleByIds(List<Long> idList) {
+        if (CollectionUtils.isEmpty(idList)) {
+            return Collections.emptyList();
         }
 
-        List<Long> dbIds = sysRoles.stream()
-                .map(SysRole::getId)
-                .collect(Collectors.toList());
+        try {
+            // 1. 批量查询
+            List<SysRole> roles = redisCacheService
+                    .<SysRole, Long>batchBuilder()
+                    .cache(RedisKey.ROLE_KEY, idList)
+                    .db(
+                            missIds -> {
+                                // 分批查询数据库
+                                LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
+                                wrapper.in(SysRole::getId, missIds);
+                                return this.list(wrapper);
+                            },
+                            SysRole::getId,
+                            SysRole.class  // 添加resultType
+                    )
+                    .nullCache(RedisKey.ROLE_NULL_KEY)  // 建议添加空值缓存
+//                    .nullCacheTimeout(30, TimeUnit.SECONDS)
+//                    .withDbBatchSize(100)  // 数据库分批大小
+//                    .enableMetrics(true)    // 启用性能监控
+                    .execute();
 
-        List<Long> notExistIds = new ArrayList<>(idList);
-        notExistIds.removeAll(dbIds);
+            // 2. 检查结果（只检查传入的ID是否都有返回）
+            Set<Long> foundIds = roles.stream()
+                    .filter(Objects::nonNull)
+                    .map(SysRole::getId)
+                    .collect(Collectors.toSet());
 
-        if (!notExistIds.isEmpty()) {
-            throw new Exception("Role id not exist: " + idStr);
+            List<Long> notFoundIds = idList.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!notFoundIds.isEmpty()) {
+                log.warn("Some role ids not found: {}", StringUtils.join(notFoundIds, ","));
+                // 根据业务需求决定是否抛异常
+                // throw new Exception("Can't get role info for ids: " + notFoundIds);
+            }
+
+            return roles;
+
+        } catch (Exception e) {
+            log.error("Failed to get roles by ids: {}", StringUtils.join(idList, ","), e);
+            throw new RuntimeException("Failed to get roles by ids", e);
         }
-        return sysRoles;
     }
 
     @Override
