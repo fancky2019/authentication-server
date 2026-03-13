@@ -4,24 +4,35 @@ package com.fancky.authorization.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysRolePermissionMapper;
+import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.service.SysRolePermissionService;
+import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionMapper, SysRolePermission>
         implements SysRolePermissionService {
 
     @Autowired
     private SysRolePermissionMapper rolePermissionMapper;
+
+    @Autowired
+    private RedisCacheService redisCacheService;
 
     @Override
     public List<Long> getPermissionIdsByRoleId(Long roleId) {
@@ -36,6 +47,55 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
         LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
         lambdaQueryWrapper.in(SysRolePermission::getRoleId, roleIdList);
         return this.list(lambdaQueryWrapper);
+
+
+//        if (CollectionUtils.isEmpty(roleIdList)) {
+//            return Collections.emptyList();
+//        }
+//
+//        try {
+//            // 1. 批量查询
+//            List<SysRolePermission> sysRolePermissions = redisCacheService
+//                    .<SysRolePermission, Long>batchBuilder()
+//                    .cache(RedisKey.ROLE_PERMISSION_KEY, roleIdList)
+//                    .db(
+//                            missIds -> {
+//                                // 分批查询数据库
+//                                LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+//                                lambdaQueryWrapper.in(SysRolePermission::getRoleId, missIds);
+//                                return this.list(lambdaQueryWrapper);
+//                            },
+//                            SysRolePermission::getId,
+//                            SysRolePermission.class  // 添加resultType
+//                    )
+//                    .nullCache(RedisKey.ROLE_PERMISSION_NULL_KEY)  // 建议添加空值缓存
+////                    .nullCacheTimeout(30, TimeUnit.SECONDS)
+////                    .withDbBatchSize(100)  // 数据库分批大小
+////                    .enableMetrics(true)    // 启用性能监控
+//                    .execute();
+//
+//            // 2. 检查结果（只检查传入的ID是否都有返回）
+//            Set<Long> foundIds = sysRolePermissions.stream()
+//                    .filter(Objects::nonNull)
+//                    .map(SysRolePermission::getRoleId)
+//                    .collect(Collectors.toSet());
+//
+//            List<Long> notFoundIds = roleIdList.stream()
+//                    .filter(id -> !foundIds.contains(id))
+//                    .collect(Collectors.toList());
+//
+//            if (!notFoundIds.isEmpty()) {
+//                log.warn("Some role ids not found: {}", StringUtils.join(notFoundIds, ","));
+//                // 根据业务需求决定是否抛异常
+//                // throw new Exception("Can't get role info for ids: " + notFoundIds);
+//            }
+//
+//            return sysRolePermissions;
+//
+//        } catch (Exception e) {
+//            log.error("Failed to get roles by ids: {}", StringUtils.join(roleIdList, ","), e);
+//            throw new RuntimeException("Failed to get roles by ids", e);
+//        }
     }
 
     @Override

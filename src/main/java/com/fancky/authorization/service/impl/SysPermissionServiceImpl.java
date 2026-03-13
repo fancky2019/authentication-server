@@ -6,23 +6,37 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysPermissionMapper;
 import com.fancky.authorization.model.dto.PermissionDTO;
 import com.fancky.authorization.model.entity.SysPermission;
+import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.service.SysPermissionService;
+import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, SysPermission>
         implements SysPermissionService {
 
     @Autowired
     private SysPermissionMapper permissionMapper;
+
+
+    @Autowired
+    private RedisCacheService redisCacheService;
+
+
 
     @Override
     public List<SysPermission> getPermissionTree() {
@@ -44,9 +58,55 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         if (CollectionUtils.isEmpty(idList)) {
             return Collections.emptyList();
         }
-        LambdaQueryWrapper<SysPermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.in(SysPermission::getId, idList);
-        return this.list(lambdaQueryWrapper);
+//        LambdaQueryWrapper<SysPermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+//        lambdaQueryWrapper.in(SysPermission::getId, idList);
+//        return this.list(lambdaQueryWrapper);
+
+
+
+        try {
+            // 1. 批量查询
+            List<SysPermission> list = redisCacheService
+                    .<SysPermission, Long>batchBuilder()
+                    .cache(RedisKey.PERMISSION_KEY, idList)
+                    .db(
+                            missIds -> {
+                                // 分批查询数据库
+                                LambdaQueryWrapper<SysPermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+                                lambdaQueryWrapper.in(SysPermission::getId, idList);
+                                return this.list(lambdaQueryWrapper);
+                            },
+                            SysPermission::getId,
+                            SysPermission.class  // 添加resultType
+                    )
+                    .nullCache(RedisKey.PERMISSION_NULL_KEY)  // 建议添加空值缓存
+//                    .nullCacheTimeout(30, TimeUnit.SECONDS)
+//                    .withDbBatchSize(100)  // 数据库分批大小
+//                    .enableMetrics(true)    // 启用性能监控
+                    .execute();
+
+            // 2. 检查结果（只检查传入的ID是否都有返回）
+            Set<Long> foundIds = list.stream()
+                    .filter(Objects::nonNull)
+                    .map(SysPermission::getId)
+                    .collect(Collectors.toSet());
+
+            List<Long> notFoundIds = idList.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!notFoundIds.isEmpty()) {
+                log.warn("Some role ids not found: {}", StringUtils.join(notFoundIds, ","));
+                // 根据业务需求决定是否抛异常
+                // throw new Exception("Can't get role info for ids: " + notFoundIds);
+            }
+
+            return list;
+
+        } catch (Exception e) {
+            log.error("Failed to get SysPermission by ids: {}", StringUtils.join(idList, ","), e);
+            throw new RuntimeException("Failed to get roles by ids", e);
+        }
     }
 
     @Override
