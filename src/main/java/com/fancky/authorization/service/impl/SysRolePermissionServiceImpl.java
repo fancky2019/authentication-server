@@ -66,7 +66,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
                             SysRolePermission::getRoleId,                    // 提取roleId
                             SysRolePermission.class
                     )
-                    .nullCache(RedisKey.ROLE_PERMISSION_NULL_KEY)
+                    .nullCache(RedisKey.ROLE_PERMISSION_ROLE_NULL_KEY)
 //                    .nullCacheTimeout(30, TimeUnit.MINUTES)
 //                    .withDbBatchSize(100)
 //                    .enableMetrics(true)

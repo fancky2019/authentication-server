@@ -163,7 +163,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 List<Long> roleIdList = userRoles.stream().map(p -> p.getRoleId()).distinct().collect(Collectors.toList());
 
-//                List<Long> idList1= Arrays.asList(99L,8L);
+                List<Long> idList1= Arrays.asList(99L,8L);
                 List<SysRole> sysRoleList = this.sysRoleService.getRoleByIds(roleIdList);
                 List<String> sysRoleCodeList = sysRoleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
                 if (sysRoleCodeList.contains(superAdmin)) {
@@ -173,7 +173,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String requestURI = request.getRequestURI();
                     // /api/auth/getCurrentUser
                     String servletPath = request.getServletPath();
-                    List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+                    List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(idList1);
                     if (CollectionUtils.isEmpty(sysRolePermissionList)) {
                         sendForbiddenResponse(response, "用户没有角色权限信息");
                         return;
