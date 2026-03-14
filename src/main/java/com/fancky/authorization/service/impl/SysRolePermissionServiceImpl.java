@@ -4,23 +4,25 @@ package com.fancky.authorization.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysRolePermissionMapper;
+import com.fancky.authorization.model.dto.RolePermissionDto;
 import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.RedisUtil;
+import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -33,6 +35,17 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
 
     @Autowired
     private RedisCacheService redisCacheService;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @Autowired
+    private RedisUtil redisUtil;
+
+    @Autowired
+    private TransactionCallbackManager callbackManager;
 
     @Override
     public List<Long> getPermissionIdsByRoleId(Long roleId) {
@@ -127,14 +140,19 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean assignRolesToPermission(Long permissionId, List<Long> roleIds) {
+    public boolean addRolePermission(RolePermissionDto dto) throws Exception {
         // 删除权限原有的角色关联
-        rolePermissionMapper.deleteByPermissionId(permissionId);
+//        rolePermissionMapper.deleteByPermissionId(permissionId);
 
-        if (roleIds == null || roleIds.isEmpty()) {
-            return true;
+        Long permissionId = dto.getPermissionId();
+        List<Long> roleIds = dto.getRoleIds();
+        if (CollectionUtils.isEmpty(roleIds)) {
+            return false;
         }
-
+        redisTemplate.delete(Arrays.asList(
+                RedisKey.ROLE_PERMISSION_KEY,
+                RedisKey.ROLE_PERMISSION_ROLE_KEY
+        ));
         // 创建新的角色关联
         List<SysRolePermission> rolePermissions = roleIds.stream()
                 .map(roleId -> {
@@ -145,7 +163,22 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
                 })
                 .collect(Collectors.toList());
 
-        return rolePermissionMapper.insertBatch(rolePermissions) > 0;
+        boolean success = this.saveBatch(rolePermissions);
+        // 3. 注册事务回调 - 方式1：链式调用
+        callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                .deleteCache(RedisKey.PERMISSION_KEY)
+                .onCommit(() -> {
+                    // 事务提交后，可以发送MQ消息通知其他服务
+                    // log.info("Permission added, sending notification...");
+                    // sendPermissionChangeNotification();
+                })
+                .onRollback(() -> {
+                    // 事务回滚后，可以做些补偿操作
+                    // log.warn("Permission addition rolled back");
+                })
+                .execute();
+        return success;
     }
 
     @Override

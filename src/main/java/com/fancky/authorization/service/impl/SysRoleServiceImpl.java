@@ -14,11 +14,14 @@ import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysRoleService;
 import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.RedisUtil;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.apache.commons.lang3.StringUtils;
@@ -37,7 +40,14 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     private SysRolePermissionMapper rolePermissionMapper;
     @Autowired
     private RedisCacheService redisCacheService;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @Autowired
+    private RedisUtil redisUtil;
     @Override
     public PageVO<SysRole> getRolePage(RoleDTO roleDTO) {
         Page<SysRole> page = new Page<>(roleDTO.getCurrent(), roleDTO.getSize());

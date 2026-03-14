@@ -3,7 +3,7 @@ package com.fancky.authorization.filter;
 
 import com.fancky.authorization.model.request.LoginRequest;
 import com.fancky.authorization.model.response.LoginResponse;
-import com.fancky.authorization.model.response.Result;
+import com.fancky.authorization.model.response.MessageResult;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.service.JwtService;
 import com.fancky.authorization.service.SysUserService;
@@ -145,7 +145,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         response.setStatus(HttpServletResponse.SC_OK);
 
         PrintWriter writer = response.getWriter();
-        writer.write(objectMapper.writeValueAsString(Result.success(loginResponse)));
+        writer.write(objectMapper.writeValueAsString(MessageResult.success(loginResponse)));
         writer.flush();
     }
 
@@ -174,7 +174,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         response.setStatus(status);
 
         PrintWriter writer = response.getWriter();
-        writer.write(objectMapper.writeValueAsString(Result.error(status, message)));
+        writer.write(objectMapper.writeValueAsString(MessageResult.faile(status, message)));
         writer.flush();
     }
 }

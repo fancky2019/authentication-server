@@ -11,8 +11,11 @@ import com.fancky.authorization.model.entity.SysDept;
 import com.fancky.authorization.model.entity.SysUserDept;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysDeptService;
+import com.fancky.authorization.utility.RedisUtil;
 import lombok.RequiredArgsConstructor;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -28,6 +31,14 @@ public class SysDeptServiceImpl extends ServiceImpl<SysDeptMapper, SysDept> impl
     private  SysDeptMapper deptMapper;
     @Autowired
     private  SysUserDeptMapper userDeptMapper;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Autowired
+    private RedissonClient redissonClient;
+
+    @Autowired
+    private RedisUtil redisUtil;
 
     @Override
     public List<SysDept> getDeptTree() {

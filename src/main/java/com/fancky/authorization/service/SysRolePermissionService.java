@@ -2,6 +2,7 @@ package com.fancky.authorization.service;
 
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.fancky.authorization.model.dto.RolePermissionDto;
 import com.fancky.authorization.model.entity.SysRolePermission;
 
 import java.util.List;
@@ -28,7 +29,7 @@ public interface SysRolePermissionService extends IService<SysRolePermission> {
     /**
      * 为权限分配角色
      */
-    boolean assignRolesToPermission(Long permissionId, List<Long> roleIds);
+    boolean addRolePermission(RolePermissionDto dto) throws Exception;
 
     /**
      * 移除角色的某个权限

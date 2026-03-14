@@ -2,17 +2,14 @@ package com.fancky.authorization.filter;
 
 
 import com.fancky.authorization.model.entity.*;
-import com.fancky.authorization.model.response.Result;
+import com.fancky.authorization.model.response.MessageResult;
 import com.fancky.authorization.service.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.sun.org.apache.bcel.internal.generic.RETURN;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.bouncycastle.jce.exception.ExtException;
-import org.bouncycastle.jce.exception.ExtIOException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -226,7 +223,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         PrintWriter writer = response.getWriter();
         writer.write(objectMapper.writeValueAsString(
-                Result.error(401, message)
+                MessageResult.faile(401, message)
         ));
         writer.flush();
     }
@@ -242,7 +239,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         PrintWriter writer = response.getWriter();
         writer.write(objectMapper.writeValueAsString(
-                Result.error(403, message)
+                MessageResult.faile(403, message)
         ));
         writer.flush();
     }

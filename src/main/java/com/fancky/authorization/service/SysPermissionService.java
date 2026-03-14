@@ -28,7 +28,7 @@ public interface SysPermissionService extends IService<SysPermission> {
     /**
      * 新增权限
      */
-    boolean addPermission(PermissionDTO permissionDTO);
+    boolean addPermission(PermissionDTO permissionDTO) throws Exception;
 
     /**
      * 更新权限

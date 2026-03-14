@@ -31,7 +31,7 @@ public class SysPermission extends BaseEntity {
     private String icon;
     @TableField("sort")
     private Integer sort;
-    @TableField("sort")
+    @TableField("visible")
     private Integer visible;
     @TableField("status")
     private Integer status;

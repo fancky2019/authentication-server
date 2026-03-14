@@ -9,19 +9,20 @@ import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.service.SysPermissionService;
 import com.fancky.authorization.utility.RedisKey;
+import com.fancky.authorization.utility.RedisUtil;
+import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -35,8 +36,17 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     @Autowired
     private RedisCacheService redisCacheService;
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
+    @Autowired
+    private RedissonClient redissonClient;
 
+    @Autowired
+    private RedisUtil redisUtil;
+
+    @Autowired
+    private TransactionCallbackManager callbackManager;
 
     @Override
     public List<SysPermission> getPermissionTree() {
@@ -61,7 +71,6 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 //        LambdaQueryWrapper<SysPermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
 //        lambdaQueryWrapper.in(SysPermission::getId, idList);
 //        return this.list(lambdaQueryWrapper);
-
 
 
         try {
@@ -111,16 +120,26 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean addPermission(PermissionDTO permissionDTO) {
+    public boolean addPermission(PermissionDTO permissionDTO) throws Exception {
+
+        //此处不加redisson 锁，数据库使用permissionCode 唯一索引兜底
         // 检查权限标识是否重复
-        if (permissionDTO.getPermissionCode() != null) {
-            Long count = permissionMapper.selectCount(new LambdaQueryWrapper<SysPermission>()
-                    .eq(SysPermission::getPermissionCode, permissionDTO.getPermissionCode()));
-            if (count > 0) {
+        if (StringUtils.isNotEmpty(permissionDTO.getPermissionCode())) {
+            Map<String, SysPermission> permissionMap = this.redisUtil.getHash(RedisKey.PERMISSION_KEY, SysPermission.class);
+            boolean existPermissionCode = false;
+            for (SysPermission permission : permissionMap.values()) {
+
+                if (permissionDTO.getPermissionCode().equals(permission.getPermissionCode())) {
+                    existPermissionCode = true;
+                    break;
+                }
+            }
+            if (existPermissionCode) {
                 throw new RuntimeException("权限标识已存在");
             }
         }
 
+        redisTemplate.delete(RedisKey.PERMISSION_KEY);
         SysPermission permission = new SysPermission();
         permission.setParentId(permissionDTO.getParentId() != null ? permissionDTO.getParentId() : 0L);
         permission.setPermissionName(permissionDTO.getPermissionName());
@@ -135,7 +154,23 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         permission.setStatus(permissionDTO.getStatus() != null ? permissionDTO.getStatus() : 1);
         permission.setRemark(permissionDTO.getRemark());
 
-        return permissionMapper.insert(permission) > 0;
+//        int affectRow = permissionMapper.insert(permission);
+        boolean success = this.save(permission);
+        // 3. 注册事务回调 - 方式1：链式调用
+        callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                .deleteCache(RedisKey.PERMISSION_KEY)
+                .onCommit(() -> {
+                    // 事务提交后，可以发送MQ消息通知其他服务
+                    // log.info("Permission added, sending notification...");
+                    // sendPermissionChangeNotification();
+                })
+                .onRollback(() -> {
+                    // 事务回滚后，可以做些补偿操作
+                    // log.warn("Permission addition rolled back");
+                })
+                .execute();
+        return success;
     }
 
     @Override

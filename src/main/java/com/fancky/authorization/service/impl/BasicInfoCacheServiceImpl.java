@@ -460,4 +460,6 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
         ValueOperations<String, Object> valueOperations = redisTemplate.opsForValue();
         valueOperations.set(keyVal, val, timeout, unit);
     }
+
+
 }
