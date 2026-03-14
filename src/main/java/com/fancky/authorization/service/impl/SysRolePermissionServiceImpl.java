@@ -44,58 +44,57 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
         if (CollectionUtils.isEmpty(roleIdList)) {
             return Collections.emptyList();
         }
-        LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.in(SysRolePermission::getRoleId, roleIdList);
-        return this.list(lambdaQueryWrapper);
+//        LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+//        lambdaQueryWrapper.in(SysRolePermission::getRoleId, roleIdList);
+//        return this.list(lambdaQueryWrapper);
 
 
-//        if (CollectionUtils.isEmpty(roleIdList)) {
-//            return Collections.emptyList();
-//        }
-//
-//        try {
-//            // 1. 批量查询
-//            List<SysRolePermission> sysRolePermissions = redisCacheService
-//                    .<SysRolePermission, Long>batchBuilder()
-//                    .cache(RedisKey.ROLE_PERMISSION_KEY, roleIdList)
-//                    .db(
-//                            missIds -> {
-//                                // 分批查询数据库
-//                                LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-//                                lambdaQueryWrapper.in(SysRolePermission::getRoleId, missIds);
-//                                return this.list(lambdaQueryWrapper);
-//                            },
-//                            SysRolePermission::getId,
-//                            SysRolePermission.class  // 添加resultType
-//                    )
-//                    .nullCache(RedisKey.ROLE_PERMISSION_NULL_KEY)  // 建议添加空值缓存
-////                    .nullCacheTimeout(30, TimeUnit.SECONDS)
-////                    .withDbBatchSize(100)  // 数据库分批大小
-////                    .enableMetrics(true)    // 启用性能监控
-//                    .execute();
-//
-//            // 2. 检查结果（只检查传入的ID是否都有返回）
-//            Set<Long> foundIds = sysRolePermissions.stream()
-//                    .filter(Objects::nonNull)
-//                    .map(SysRolePermission::getRoleId)
-//                    .collect(Collectors.toSet());
-//
-//            List<Long> notFoundIds = roleIdList.stream()
-//                    .filter(id -> !foundIds.contains(id))
-//                    .collect(Collectors.toList());
-//
-//            if (!notFoundIds.isEmpty()) {
-//                log.warn("Some role ids not found: {}", StringUtils.join(notFoundIds, ","));
-//                // 根据业务需求决定是否抛异常
-//                // throw new Exception("Can't get role info for ids: " + notFoundIds);
-//            }
-//
-//            return sysRolePermissions;
-//
-//        } catch (Exception e) {
-//            log.error("Failed to get roles by ids: {}", StringUtils.join(roleIdList, ","), e);
-//            throw new RuntimeException("Failed to get roles by ids", e);
-//        }
+        // 此处保存的是set  ,通用保存的是hashmap.
+
+
+        try {
+            // 1. 批量查询
+            List<SysRolePermission> sysRolePermissions = redisCacheService.<SysRolePermission, Long>listBatchBuilder()
+                    .cache(RedisKey.ROLE_PERMISSION_ROLE_KEY, roleIdList)
+                    .db(
+                            missIds -> {
+                                // 分批查询数据库
+                                LambdaQueryWrapper<SysRolePermission> wrapper = new LambdaQueryWrapper<>();
+                                wrapper.in(SysRolePermission::getRoleId, missIds);
+                                return this.list(wrapper);
+                            }, // 返回 List<SysRolePermission>
+                            SysRolePermission::getRoleId,                    // 提取roleId
+                            SysRolePermission.class
+                    )
+                    .nullCache(RedisKey.ROLE_PERMISSION_NULL_KEY)
+//                    .nullCacheTimeout(30, TimeUnit.MINUTES)
+//                    .withDbBatchSize(100)
+//                    .enableMetrics(true)
+                    .returnEmptyList(true)  // 没有权限时返回空List而不是null
+                    .execute();
+
+            // 2. 检查结果（只检查传入的ID是否都有返回）
+            Set<Long> foundIds = sysRolePermissions.stream()
+                    .filter(Objects::nonNull)
+                    .map(SysRolePermission::getRoleId)
+                    .collect(Collectors.toSet());
+
+            List<Long> notFoundIds = roleIdList.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!notFoundIds.isEmpty()) {
+                log.warn("Some role ids not found: {}", StringUtils.join(notFoundIds, ","));
+                // 根据业务需求决定是否抛异常
+                // throw new Exception("Can't get role info for ids: " + notFoundIds);
+            }
+
+            return sysRolePermissions;
+
+        } catch (Exception e) {
+            log.error("Failed to get roles by ids: {}", StringUtils.join(roleIdList, ","), e);
+            throw new RuntimeException("Failed to get roles by ids", e);
+        }
     }
 
     @Override

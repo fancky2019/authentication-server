@@ -59,6 +59,11 @@ public class RedisKey {
 
     public static final String ROLE_PERMISSION_KEY = "BasicInfo:RolePermission";
     public static final String ROLE_PERMISSION_NULL_KEY = "BasicInfo:RolePermission:Null:";
+
+    public static final String ROLE_PERMISSION_ROLE_KEY = "BasicInfo:RolePermission:Role";
+    public static final String ROLE_PERMISSION_ROLE_NULL_KEY = "BasicInfo:RolePermission:Role:Null:";
+
+
     //endregion
 
 

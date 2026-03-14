@@ -36,7 +36,7 @@ public class ApplicationRunnerImp implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         log.info("ApplicationRunnerImp");
-//        basicInfoCacheService.initBasicInfoCache();
+        basicInfoCacheService.initBasicInfoCache();
         log.info("ApplicationRunnerImp Complete");
 
     }

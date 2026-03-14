@@ -240,6 +240,12 @@ public class RedisCacheService {
     }
 
 
+    /**
+     * hash field object
+     * @return
+     * @param <T>
+     * @param <K>
+     */
     public <T, K> BatchCacheQueryBuilder<T, K> batchBuilder() {
         return new BatchCacheQueryBuilder<>();
     }
@@ -705,6 +711,546 @@ public class RedisCacheService {
             Assert.notNull(dbFunction, "DB function must not be null");
             Assert.notNull(idExtractor, "ID extractor must not be null");
             Assert.notNull(resultType, "Result type must not be null");
+
+            if (dbBatchSize <= 0) {
+                throw new IllegalArgumentException("DB batch size must be positive");
+            }
+            if (pipelineBatchSize <= 0) {
+                throw new IllegalArgumentException("Pipeline batch size must be positive");
+            }
+        }
+    }
+
+
+    /**
+     * hash 的value  根据field  分组
+     * hash field List<object>
+     * @return
+     * @param <T>
+     * @param <K>
+     */
+    public <T, K> ListCacheQueryBuilder<T, K> listBatchBuilder() {
+        return new ListCacheQueryBuilder<>();
+    }
+
+    /**
+     * 专门处理Hash Value是List类型的缓存查询构建器
+     * 数据库返回 List<SysRolePermission>，需要按roleId分组后缓存
+     */
+    public class ListCacheQueryBuilder<T, K> {
+
+        // 核心参数
+        private String cacheKey;                    // Hash的key
+        private List<K> fields;                      // Hash的field列表 (roleId列表)
+        private Function<List<K>, List<T>> dbFunction;  // 数据库查询函数，返回 List<SysRolePermission>
+        private Function<T, K> idExtractor;           // 从实体中提取roleId的函数
+        private Class<T> entityType;                   // 实体类型
+
+        // 可选参数
+        private String nullCacheKey;                  // 空值缓存Key
+        private long nullCacheTimeout = RedisKey.TIME_OUT_ONE_MINUTE;
+        private TimeUnit nullCacheTimeUnit = TimeUnit.SECONDS;
+
+        private int dbBatchSize = 100;                // 数据库批量查询大小
+        private int pipelineBatchSize = 200;           // Redis pipeline批量大小
+        private boolean enableMetrics = false;         // 是否启用性能监控
+        private boolean returnEmptyList = true;        // 是否返回空列表而非null
+
+        private static final String EMPTY_VALUE = RedisKey.EMPTY_VALUE;
+
+
+
+        /**
+         * 设置缓存信息
+         * @param cacheKey Hash的key
+         * @param fields Hash的field列表 (roleId列表)
+         */
+        public ListCacheQueryBuilder<T, K> cache(String cacheKey, List<K> fields) {
+            this.cacheKey = cacheKey;
+            this.fields = fields;
+            return this;
+        }
+
+        /**
+         * 设置数据库查询函数
+         * @param dbFunction 接收ID列表，返回 List<T> (如 List<SysRolePermission>)
+         * @param idExtractor 从实体中提取ID的函数 (如 SysRolePermission::getRoleId)
+         * @param entityType 实体类型
+         */
+        public ListCacheQueryBuilder<T, K> db(
+                Function<List<K>, List<T>> dbFunction,
+                Function<T, K> idExtractor,
+                Class<T> entityType) {
+            this.dbFunction = dbFunction;
+            this.idExtractor = idExtractor;
+            this.entityType = entityType;
+            return this;
+        }
+
+        /**
+         * 设置空值缓存
+         */
+        public ListCacheQueryBuilder<T, K> nullCache(String nullCacheKey) {
+            this.nullCacheKey = nullCacheKey;
+            return this;
+        }
+
+        /**
+         * 设置空值缓存超时时间
+         */
+        public ListCacheQueryBuilder<T, K> nullCacheTimeout(long timeout, TimeUnit unit) {
+            this.nullCacheTimeout = timeout;
+            this.nullCacheTimeUnit = unit;
+            return this;
+        }
+
+        /**
+         * 设置数据库批量查询大小
+         */
+        public ListCacheQueryBuilder<T, K> withDbBatchSize(int dbBatchSize) {
+            this.dbBatchSize = dbBatchSize;
+            return this;
+        }
+
+        /**
+         * 设置Redis pipeline批量大小
+         */
+        public ListCacheQueryBuilder<T, K> withPipelineBatchSize(int pipelineBatchSize) {
+            this.pipelineBatchSize = pipelineBatchSize;
+            return this;
+        }
+
+        /**
+         * 是否启用性能监控
+         */
+        public ListCacheQueryBuilder<T, K> enableMetrics(boolean enable) {
+            this.enableMetrics = enable;
+            return this;
+        }
+
+        /**
+         * 设置是否返回空列表（true返回空List，false返回null）
+         */
+        public ListCacheQueryBuilder<T, K> returnEmptyList(boolean returnEmptyList) {
+            this.returnEmptyList = returnEmptyList;
+            return this;
+        }
+
+        /**
+         * 执行查询 - 返回List<List<T>>，每个元素是对应roleId的权限列表
+         */
+        @SuppressWarnings("unchecked")
+        public List<T> execute() {
+            long startTime = enableMetrics ? System.currentTimeMillis() : 0;
+
+            try {
+                // 参数校验
+                validateParams();
+
+                if (CollectionUtils.isEmpty(fields)) {
+                    log.debug("Empty fields list, returning empty result");
+                    return Collections.emptyList();
+                }
+
+                // 去重
+                List<K> distinctFields = distinctFields(fields);
+                if (distinctFields.size() != fields.size()) {
+                    log.debug("Fields list contains duplicates, deduplicated from {} to {}",
+                            fields.size(), distinctFields.size());
+                }
+
+                // 执行核心查询逻辑
+                Map<K, List<T>> resultMap = executeQuery(distinctFields);
+
+                // 按原始顺序返回结果
+                return buildOrderedResult(resultMap);
+
+            } finally {
+                if (enableMetrics) {
+                    long cost = System.currentTimeMillis() - startTime;
+                    log.info("ListCache query executed in {} ms, fields count: {}", cost, fields.size());
+                }
+            }
+        }
+
+        /**
+         * 核心查询逻辑
+         */
+        private Map<K, List<T>> executeQuery(List<K> queryFields) {
+            Map<K, List<T>> resultMap = new HashMap<>(queryFields.size() * 2);
+
+            // 1. 批量查询缓存
+            List<Object> cachedLists = batchGetFromCache(queryFields);
+
+            // 2. 批量查询空值缓存
+            Set<K> nullCachedKeys = shouldCheckNullCache() ?
+                    batchGetNullCache(queryFields) : Collections.emptySet();
+
+            // 3. 分析缓存命中情况
+            List<K> missIds = analyzeCacheHits(queryFields, cachedLists, nullCachedKeys, resultMap);
+
+            // 4. 处理未命中的数据
+            if (!missIds.isEmpty()) {
+                loadFromDbWithLock(missIds, resultMap);
+            }
+
+            return resultMap;
+        }
+
+        /**
+         * 批量从缓存获取List
+         */
+        private List<Object> batchGetFromCache(List<K> fields) {
+            try {
+                List<Object> strFields = fields.stream()
+                        .map(String::valueOf)
+                        .collect(Collectors.toList());
+
+                return redisTemplate.opsForHash().multiGet(cacheKey, strFields);
+            } catch (Exception e) {
+                log.error("Failed to batch get from cache: {}", cacheKey, e);
+                return Collections.emptyList();
+            }
+        }
+
+        /**
+         * 判断是否需要检查空值缓存
+         */
+        private boolean shouldCheckNullCache() {
+            return nullCacheKey != null;
+        }
+
+        /**
+         * 批量获取空值缓存
+         */
+        private Set<K> batchGetNullCache(List<K> ids) {
+            if (CollectionUtils.isEmpty(ids)) {
+                return Collections.emptySet();
+            }
+
+            Set<K> nullSet = new HashSet<>();
+
+            try {
+                List<List<K>> batches = ListUtils.partition(ids, pipelineBatchSize);
+
+                for (List<K> batch : batches) {
+                    List<String> keys = batch.stream()
+                            .map(this::buildNullCacheKey)
+                            .collect(Collectors.toList());
+
+                    List<Object> values = redisTemplate.opsForValue().multiGet(keys);
+                    if (values != null) {
+                        for (int i = 0; i < batch.size(); i++) {
+                            if (values.get(i) != null) {
+                                nullSet.add(batch.get(i));
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to batch get null cache", e);
+            }
+
+            return nullSet;
+        }
+
+        /**
+         * 构建空值缓存key
+         */
+        private String buildNullCacheKey(K id) {
+            return nullCacheKey + ":" + id;
+        }
+
+        /**
+         * 分析缓存命中情况
+         */
+        @SuppressWarnings("unchecked")
+        private List<K> analyzeCacheHits(List<K> queryFields, List<Object> cachedLists,
+                                         Set<K> nullCachedKeys, Map<K, List<T>> resultMap) {
+            List<K> missIds = new ArrayList<>();
+
+            for (int i = 0; i < queryFields.size(); i++) {
+                K id = queryFields.get(i);
+                Object obj = i < cachedLists.size() ? cachedLists.get(i) : null;
+
+                if (obj != null) {
+                    // 缓存命中
+                    if (obj instanceof List) {
+                        resultMap.put(id, (List<T>) obj);
+                        log.trace("Cache hit for roleId: {}, permission count: {}", id, ((List<?>) obj).size());
+                    } else {
+                        log.warn("Cached value for roleId {} is not a List, type: {}, will reload",
+                                id, obj.getClass().getName());
+                        missIds.add(id);
+                    }
+                } else if (nullCachedKeys.contains(id)) {
+                    // 空值缓存命中
+                    resultMap.put(id, returnEmptyList ? new ArrayList<>() : null);
+                    log.trace("Null cache hit for roleId: {}", id);
+                } else {
+                    // 未命中
+                    missIds.add(id);
+                }
+            }
+
+            return missIds;
+        }
+
+        /**
+         * 带分布式锁的数据库加载（实现双检锁）
+         */
+        private void loadFromDbWithLock(List<K> missIds, Map<K, List<T>> resultMap) {
+            String lockKey = RedisKey.REDISSON_PREFIX + "LIST_" + entityType.getSimpleName();
+            RLock lock = redissonClient.getLock(lockKey);
+            boolean lockSuccess = false;
+
+            try {
+                lockSuccess = lock.tryLock(
+                        RedisKey.TIME_OUT_HALF_MINUTE,
+                        RedisKey.TIME_OUT_ONE_MINUTE,
+                        TimeUnit.SECONDS);
+
+                if (!lockSuccess) {
+                    log.warn("Failed to acquire lock for key: {}, will load from DB without cache", lockKey);
+                    loadFromDbWithoutCache(missIds, resultMap);
+                    return;
+                }
+
+                // 双检锁：重新检查缓存
+                log.debug("Acquired lock, performing double check for {} roleIds", missIds.size());
+
+                // 重新检查缓存
+                List<Object> recheckCached = batchGetFromCache(missIds);
+                Set<K> recheckNullSet = shouldCheckNullCache() ?
+                        batchGetNullCache(missIds) : Collections.emptySet();
+
+                // 重新分析未命中ID
+                List<K> stillMissIds = new ArrayList<>();
+                for (int i = 0; i < missIds.size(); i++) {
+                    K id = missIds.get(i);
+                    Object obj = i < recheckCached.size() ? recheckCached.get(i) : null;
+
+                    if (obj != null && obj instanceof List) {
+                        resultMap.put(id, (List<T>) obj);
+                        log.debug("Double check hit cache for roleId: {}", id);
+                    } else if (recheckNullSet.contains(id)) {
+                        resultMap.put(id, returnEmptyList ? new ArrayList<>() : null);
+                        log.debug("Double check hit null cache for roleId: {}", id);
+                    } else {
+                        stillMissIds.add(id);
+                    }
+                }
+
+                // 查询数据库并缓存
+                if (!stillMissIds.isEmpty()) {
+                    log.debug("Double check still miss {} roleIds, loading from DB", stillMissIds.size());
+                    loadFromDbAndCache(stillMissIds, resultMap);
+                }
+
+            } catch (InterruptedException e) {
+                log.error("Interrupted while acquiring lock", e);
+                Thread.currentThread().interrupt();
+                loadFromDbWithoutCache(missIds, resultMap);
+            } catch (Exception e) {
+                log.error("Error in loadFromDbWithLock", e);
+                loadFromDbWithoutCache(missIds, resultMap);
+            } finally {
+                if (lockSuccess) {
+                    redisUtil.releaseLock(lock, true);
+                }
+            }
+        }
+
+        /**
+         * 从数据库加载并写入缓存
+         */
+        private void loadFromDbAndCache(List<K> missIds, Map<K, List<T>> resultMap) {
+            List<List<K>> batches = ListUtils.partition(missIds, dbBatchSize);
+            int totalBatches = batches.size();
+            int currentBatch = 0;
+
+            for (List<K> batch : batches) {
+                currentBatch++;
+                long startTime = enableMetrics ? System.currentTimeMillis() : 0;
+
+                try {
+                    // 查询数据库 - 返回 List<T> (如 List<SysRolePermission>)
+                    List<T> dbResult = dbFunction.apply(batch);
+
+                    if (enableMetrics) {
+                        long cost = System.currentTimeMillis() - startTime;
+                        log.debug("DB batch {}/{} executed in {} ms, batch size: {}, total records: {}",
+                                currentBatch, totalBatches, cost, batch.size(),
+                                dbResult != null ? dbResult.size() : 0);
+                    }
+
+                    // 按roleId分组
+                    Map<K, List<T>> groupedMap = groupByHashField(dbResult);
+
+                    // 更新结果Map
+                    for (K roleId : batch) {
+                        List<T> permissions = groupedMap.get(roleId);
+                        if (permissions != null && !permissions.isEmpty()) {
+                            resultMap.put(roleId, permissions);
+                        } else {
+                            // 没有权限，返回空列表
+                            resultMap.put(roleId, returnEmptyList ? new ArrayList<>() : null);
+                        }
+                    }
+
+                    // 批量写入缓存
+                    writeToCache(batch, groupedMap);
+
+                } catch (Exception e) {
+                    log.error("Failed to load from DB for batch {}/{}", currentBatch, totalBatches, e);
+                    // 异常时返回空列表
+                    for (K roleId : batch) {
+                        resultMap.put(roleId, returnEmptyList ? new ArrayList<>() : null);
+                    }
+                }
+            }
+        }
+
+        /**
+         * 按roleId分组
+         */
+        private Map<K, List<T>> groupByHashField(List<T> dbResult) {
+            if (CollectionUtils.isEmpty(dbResult)) {
+                return Collections.emptyMap();
+            }
+
+            return dbResult.stream()
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.groupingBy(
+                            idExtractor,
+                            HashMap::new,
+                            Collectors.toCollection(ArrayList::new)
+                    ));
+        }
+
+        /**
+         * 降级方法：只查询数据库，不写缓存
+         */
+        private void loadFromDbWithoutCache(List<K> missIds, Map<K, List<T>> resultMap) {
+            log.warn("Fallback to load from DB without cache for {} roleIds", missIds.size());
+
+            List<List<K>> batches = ListUtils.partition(missIds, dbBatchSize);
+
+            for (List<K> batch : batches) {
+                try {
+                    List<T> dbResult = dbFunction.apply(batch);
+                    Map<K, List<T>> groupedMap = groupByHashField(dbResult);
+
+                    for (K roleId : batch) {
+                        List<T> permissions = groupedMap.get(roleId);
+                        resultMap.put(roleId, permissions != null ? permissions :
+                                (returnEmptyList ? new ArrayList<>() : null));
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to load from DB for batch: {}", batch, e);
+                    for (K roleId : batch) {
+                        resultMap.put(roleId, returnEmptyList ? new ArrayList<>() : null);
+                    }
+                }
+            }
+        }
+
+        /**
+         * 写入缓存
+         * @param batch 查询的roleId列表
+         * @param groupedMap 分组后的权限Map
+         */
+        private void writeToCache(List<K> batch, Map<K, List<T>> groupedMap) {
+            if (batch.isEmpty()) {
+                return;
+            }
+
+            try {
+                // 1. 写入主缓存 - 将每个roleId的权限列表存入Hash
+                Map<String, List<T>> mainCacheMap = new HashMap<>();
+
+                for (K roleId : batch) {
+                    List<T> permissions = groupedMap.get(roleId);
+                    if (permissions != null && !permissions.isEmpty()) {
+                        mainCacheMap.put(String.valueOf(roleId), permissions);
+                        log.trace("Caching permissions for roleId: {}, count: {}", roleId, permissions.size());
+                    }
+                }
+
+                if (!mainCacheMap.isEmpty()) {
+                    redisTemplate.opsForHash().putAll(cacheKey, mainCacheMap);
+                    log.debug("Wrote {} role permissions to cache: {}", mainCacheMap.size(), cacheKey);
+                }
+
+                // 2. 写入空值缓存 - 对于没有权限的roleId
+                if (nullCacheKey != null) {
+                    List<K> nullEntries = batch.stream()
+                            .filter(roleId -> !groupedMap.containsKey(roleId) || groupedMap.get(roleId).isEmpty())
+                            .collect(Collectors.toList());
+
+                    if (!nullEntries.isEmpty()) {
+                        writeNullCache(nullEntries);
+                        log.debug("Wrote null cache for {} roleIds without permissions", nullEntries.size());
+                    }
+                }
+
+            } catch (Exception e) {
+                log.error("Failed to write to cache for key: {}", cacheKey, e);
+            }
+        }
+
+        /**
+         * 写入空值缓存
+         */
+        private void writeNullCache(List<K> nullEntries) {
+            redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+                long timeout = nullCacheTimeUnit.toSeconds(nullCacheTimeout);
+                byte[] emptyBytes = redisTemplate.getStringSerializer().serialize(EMPTY_VALUE);
+
+                for (K id : nullEntries) {
+                    String nullKey = buildNullCacheKey(id);
+                    byte[] keyBytes = redisTemplate.getStringSerializer().serialize(nullKey);
+                    connection.setEx(keyBytes, timeout, emptyBytes);
+                }
+                return null;
+            });
+        }
+
+        /**
+         * 构建有序结果
+         */
+        private List<T> buildOrderedResult(Map<K, List<T>> resultMap) {
+            List<T> result = new ArrayList<>(fields.size());
+
+            for (K roleId : fields) {
+                List<T> permissions = resultMap.get(roleId);
+                if (permissions != null) {
+                    result.addAll(permissions);
+                }
+            }
+
+            return result;
+        }
+
+        /**
+         * 字段去重
+         */
+        private List<K> distinctFields(List<K> fields) {
+            return fields.stream()
+                    .filter(Objects::nonNull)
+                    .distinct()
+                    .collect(Collectors.toList());
+        }
+
+        /**
+         * 参数校验
+         */
+        private void validateParams() {
+            Assert.notNull(cacheKey, "Cache key must not be null");
+            Assert.notEmpty(fields, "Fields must not be empty");
+            Assert.notNull(dbFunction, "DB function must not be null");
+            Assert.notNull(idExtractor, "ID extractor must not be null");
+            Assert.notNull(entityType, "Entity type must not be null");
 
             if (dbBatchSize <= 0) {
                 throw new IllegalArgumentException("DB batch size must be positive");

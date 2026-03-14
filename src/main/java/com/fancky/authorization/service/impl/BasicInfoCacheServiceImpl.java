@@ -6,6 +6,7 @@ import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.collections4.CollectionUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -14,11 +15,11 @@ import org.springframework.data.redis.core.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
 
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -61,8 +62,6 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
     @Autowired
     @Qualifier("threadPoolExecutor")
     private Executor threadPoolExecutor;
-
-
 
 
     public static final int EMPTY_VALUE_EXPIRE_TIME = 5;
@@ -137,12 +136,62 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
     @Override
     public void initUserRolePermission() {
         log.info("start init RolePermission");
-        redisTemplate.delete(RedisKey.ROLE_PERMISSION_KEY);
-        log.info("delete RolePermission complete");
+
+        long startTime = System.currentTimeMillis();
+
+        // 1. 清理缓存（使用pipe删除多个key）
+        redisTemplate.delete(Arrays.asList(
+                RedisKey.ROLE_PERMISSION_KEY,
+                RedisKey.ROLE_PERMISSION_ROLE_KEY
+        ));
+        log.info("RolePermission Cache cleared");
+
+        // 2. 查询所有角色权限关系
         List<SysRolePermission> list = this.sysRolePermissionService.list();
-        Map<String, SysRolePermission> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_KEY, map);
-        log.info("init RolePermission complete");
+
+        if (CollectionUtils.isEmpty(list)) {
+            log.warn("No role permission data found");
+            return;
+        }
+
+        // 3. 存储原始数据（按ID索引）
+        Map<String, SysRolePermission> idMap = list.stream()
+                .collect(Collectors.toMap(
+                        p -> p.getId().toString(),
+                        Function.identity(),
+                        (v1, v2) -> v1  // 如果有重复，保留第一个
+                ));
+
+        redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_KEY, idMap);
+        log.info("RolePermission data cached, size: {}", idMap.size());
+
+        // 4. 使用Stream分组，构建角色-权限映射
+        Map<String, Set<SysRolePermission>> rolePermissionMap = list.stream()
+                .collect(Collectors.groupingBy(
+                        rp -> rp.getRoleId().toString(),
+                        HashMap::new,
+                        Collectors.toCollection(HashSet::new)
+                ));
+
+
+
+        // 6. 批量存入Redis
+        if (!rolePermissionMap.isEmpty()) {
+            redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_ROLE_KEY, rolePermissionMap);
+            log.info("Role-Permission mapping cached, role count: {}", rolePermissionMap.size());
+        }
+
+
+
+        //取值
+//        Object obj = redisTemplate.opsForHash().get(RedisKey.ROLE_PERMISSION_ROLE_KEY, key);
+//        if (obj instanceof Set) {
+//            Set<Long> data = (Set<Long>) obj;
+//        }
+
+        long cost = System.currentTimeMillis() - startTime;
+        log.info("init RolePermission complete, total records: {}, cost: {}ms",
+                list.size(), cost);
     }
 
 
