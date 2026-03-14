@@ -112,18 +112,76 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
 
     @Override
     public void initUserRole() {
+//        log.info("start init UserRole");
+//        redisTemplate.delete(RedisKey.USER_ROLE_KEY);
+//        log.info("delete UserRole complete");
+//        List<SysUserRole> list = this.sysUserRoleService.list();
+//        Map<String, SysUserRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
+//        redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_KEY, map);
+//        log.info("init UserRole complete");
+
+
         log.info("start init UserRole");
-        redisTemplate.delete(RedisKey.USER_ROLE_KEY);
-        log.info("delete UserRole complete");
+
+        long startTime = System.currentTimeMillis();
+
+        // 1. 清理缓存（使用pipe删除多个key）
+        redisTemplate.delete(Arrays.asList(
+                RedisKey.USER_ROLE_KEY,
+                RedisKey.USER_ROLE_USER_KEY
+        ));
+        log.info("SysUserRole Cache cleared");
+
+        // 2. 查询所有角色权限关系
         List<SysUserRole> list = this.sysUserRoleService.list();
-        Map<String, SysUserRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_KEY, map);
-        log.info("init UserRole complete");
+
+        if (CollectionUtils.isEmpty(list)) {
+            log.warn("No SysUserRole data found");
+            return;
+        }
+
+        // 3. 存储原始数据（按ID索引）
+        Map<String, SysUserRole> idMap = list.stream()
+                .collect(Collectors.toMap(
+                        p -> p.getId().toString(),
+                        Function.identity(),
+                        (v1, v2) -> v1  // 如果有重复，保留第一个
+                ));
+
+        redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_KEY, idMap);
+        log.info("SysUserRole data cached, size: {}", idMap.size());
+
+        // 4. 使用Stream分组，构建角色-权限映射
+//        //set
+//        Map<String, Set<SysUserRole>> userIdKeyMap = list.stream()
+//                .collect(Collectors.groupingBy(
+//                        rp -> rp.getUserId().toString(),
+//                        HashMap::new,
+//                        Collectors.toCollection(HashSet::new)
+//                ));
+
+        //List
+        Map<String, List<SysUserRole>> userIdKeyMap = list.stream()
+                .collect(Collectors.groupingBy(
+                        rp -> rp.getUserId().toString(),
+                        HashMap::new,
+                        Collectors.toList()  // 改为 toList()，生成 ArrayList
+                ));
+
+        // 6. 批量存入Redis
+        if (!userIdKeyMap.isEmpty()) {
+            redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_USER_KEY, userIdKeyMap);
+            log.info("SysUserRole mapping cached, role count: {}", userIdKeyMap.size());
+        }
+
+        long cost = System.currentTimeMillis() - startTime;
+        log.info("init SysUserRole complete, total records: {}, cost: {}ms",
+                list.size(), cost);
     }
 
 
     @Override
-    public void initUserPermission() {
+    public void initPermission() {
         log.info("start init Permission");
         redisTemplate.delete(RedisKey.PERMISSION_KEY);
         log.info("delete Permission complete");
@@ -134,7 +192,7 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
     }
 
     @Override
-    public void initUserRolePermission() {
+    public void initRolePermission() {
         log.info("start init RolePermission");
 
         long startTime = System.currentTimeMillis();
@@ -166,11 +224,11 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
         log.info("RolePermission data cached, size: {}", idMap.size());
 
         // 4. 使用Stream分组，构建角色-权限映射
-        Map<String, Set<SysRolePermission>> rolePermissionMap = list.stream()
+        Map<String, List<SysRolePermission>> rolePermissionMap = list.stream()
                 .collect(Collectors.groupingBy(
                         rp -> rp.getRoleId().toString(),
                         HashMap::new,
-                        Collectors.toCollection(HashSet::new)
+                        Collectors.toList() // Collectors.toCollection(HashSet::new)
                 ));
 
 
@@ -287,16 +345,16 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
         CompletableFuture<Void> initUserFuture = CompletableFuture.runAsync(basicInfoCacheService::initUser, threadPoolExecutor);
         CompletableFuture<Void> initRoleFuture = CompletableFuture.runAsync(basicInfoCacheService::initRole, threadPoolExecutor);
         CompletableFuture<Void> initUserRoleFuture = CompletableFuture.runAsync(basicInfoCacheService::initUserRole, threadPoolExecutor);
-        CompletableFuture<Void> initUserPermissionFuture = CompletableFuture.runAsync(basicInfoCacheService::initUserPermission, threadPoolExecutor);
-        CompletableFuture<Void> initUserRolePermissionFuture = CompletableFuture.runAsync(basicInfoCacheService::initUserRolePermission, threadPoolExecutor);
+        CompletableFuture<Void> initPermissionFuture = CompletableFuture.runAsync(basicInfoCacheService::initPermission, threadPoolExecutor);
+        CompletableFuture<Void> initRolePermissionFuture = CompletableFuture.runAsync(basicInfoCacheService::initRolePermission, threadPoolExecutor);
 
         // 等待所有任务完成
         CompletableFuture<Void> allFutures = CompletableFuture.allOf(
                 initUserFuture,
                 initRoleFuture,
                 initUserRoleFuture,
-                initUserPermissionFuture,
-                initUserRolePermissionFuture
+                initPermissionFuture,
+                initRolePermissionFuture
         );
 
         // 阻塞等待所有任务完成

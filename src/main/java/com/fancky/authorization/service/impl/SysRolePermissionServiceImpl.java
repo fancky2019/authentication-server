@@ -54,7 +54,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
 
         try {
             // 1. 批量查询
-            List<SysRolePermission> sysRolePermissions = redisCacheService.<SysRolePermission, Long>listBatchBuilder()
+            List<SysRolePermission> dataList = redisCacheService.<SysRolePermission, Long>listBatchBuilder()
                     .cache(RedisKey.ROLE_PERMISSION_ROLE_KEY, roleIdList)
                     .db(
                             missIds -> {
@@ -62,8 +62,8 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
                                 LambdaQueryWrapper<SysRolePermission> wrapper = new LambdaQueryWrapper<>();
                                 wrapper.in(SysRolePermission::getRoleId, missIds);
                                 return this.list(wrapper);
-                            }, // 返回 List<SysRolePermission>
-                            SysRolePermission::getRoleId,                    // 提取roleId
+                            },
+                            SysRolePermission::getRoleId,
                             SysRolePermission.class
                     )
                     .nullCache(RedisKey.ROLE_PERMISSION_ROLE_NULL_KEY)
@@ -74,7 +74,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
                     .execute();
 
             // 2. 检查结果（只检查传入的ID是否都有返回）
-            Set<Long> foundIds = sysRolePermissions.stream()
+            Set<Long> foundIds = dataList.stream()
                     .filter(Objects::nonNull)
                     .map(SysRolePermission::getRoleId)
                     .collect(Collectors.toSet());
@@ -89,7 +89,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
                 // throw new Exception("Can't get role info for ids: " + notFoundIds);
             }
 
-            return sysRolePermissions;
+            return dataList;
 
         } catch (Exception e) {
             log.error("Failed to get roles by ids: {}", StringUtils.join(roleIdList, ","), e);

@@ -42,8 +42,6 @@ public class RedisKey {
     //region sys
     public static final String USER_KEY = "BasicInfo:User";
     public static final String USER_CODE_KEY = "BasicInfo:User:Code";
-    //string
-    public static final String USER_PREFIX = "BasicInfo:User:";
     public static final String USER_NULL_PREFIX = "BasicInfo:User:Null:";
     public static final String USER_CODE_NULL_PREFIX = "BasicInfo:User:Code:Null:";
 
@@ -52,14 +50,13 @@ public class RedisKey {
     public static final String ROLE_NULL_KEY = "BasicInfo:Role:Null:";
 
     public static final String USER_ROLE_KEY = "BasicInfo:UserRole";
-    public static final String USER_ROLE_NULL_KEY = "BasicInfo:UserRole:Null:";
+    public static final String USER_ROLE_USER_KEY = "BasicInfo:UserRole:User";
+    public static final String USER_ROLE_USER_NULL_KEY = "BasicInfo:UserRole:User:Null:";
 
     public static final String PERMISSION_KEY = "BasicInfo:Permission";
     public static final String PERMISSION_NULL_KEY = "BasicInfo:Permission:Null:";
 
     public static final String ROLE_PERMISSION_KEY = "BasicInfo:RolePermission";
-    public static final String ROLE_PERMISSION_NULL_KEY = "BasicInfo:RolePermission:Null:";
-
     public static final String ROLE_PERMISSION_ROLE_KEY = "BasicInfo:RolePermission:Role";
     public static final String ROLE_PERMISSION_ROLE_NULL_KEY = "BasicInfo:RolePermission:Role:Null:";
 

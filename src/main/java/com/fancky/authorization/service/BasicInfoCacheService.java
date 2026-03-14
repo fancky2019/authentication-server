@@ -1,7 +1,5 @@
 package com.fancky.authorization.service;
 
-import java.util.List;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 public interface BasicInfoCacheService {
@@ -14,9 +12,9 @@ public interface BasicInfoCacheService {
 
     void initUserRole();
 
-    void initUserPermission();
+    void initPermission();
 
-    void initUserRolePermission();
+    void initRolePermission();
 
 
 

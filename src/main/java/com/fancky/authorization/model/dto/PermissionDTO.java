@@ -15,6 +15,9 @@ public class PermissionDTO {
     @NotBlank(message = "权限名称不能为空")
     private String permissionName;
 
+    /**
+     * 权限类型(1-目录 2-菜单 3-按钮 4-接口 5-数据)
+     */
     @NotNull(message = "权限类型不能为空")
     private Integer permissionType;
 
