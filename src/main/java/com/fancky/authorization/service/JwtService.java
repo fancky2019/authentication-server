@@ -17,6 +17,8 @@ public interface JwtService {
 
     Boolean validateToken(String token, UserDetails userDetails);
 
+    String getUsername(HttpServletRequest request);
+
     String getTokenFromRequest(HttpServletRequest request);
 
     String refreshAccessToken(String refreshToken);

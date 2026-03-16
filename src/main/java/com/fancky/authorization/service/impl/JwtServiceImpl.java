@@ -37,14 +37,13 @@ public class JwtServiceImpl implements JwtService {
     @Value("${jwt.header}")
     private String header;
     @Autowired
-    private  StringRedisTemplate redisTemplate;
+    private StringRedisTemplate redisTemplate;
     @Autowired
     private UserDetailsServiceImpl userDetailsService;
 
     private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
     private static final String REFRESH_PREFIX = "jwt:refresh:";
     private static final String TOKEN_USER_PREFIX = "jwt:user:";
-
 
 
 //    private final StringRedisTemplate redisTemplate;
@@ -112,6 +111,16 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
+    public String getUsername(HttpServletRequest request) {
+        String bearerToken = request.getHeader(header);
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(tokenPrefix + " ")) {
+            String token = bearerToken.substring(tokenPrefix.length() + 1);
+            return getUsernameFromToken(token);
+        }
+        return null;
+    }
+
+    @Override
     public String getUsernameFromToken(String token) {
         try {
             Claims claims = Jwts.parser()
@@ -126,6 +135,15 @@ public class JwtServiceImpl implements JwtService {
             log.error("解析令牌失败: {}", e.getMessage());
             return null;
         }
+    }
+
+    @Override
+    public String getTokenFromRequest(HttpServletRequest request) {
+        String bearerToken = request.getHeader(header);
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(tokenPrefix + " ")) {
+            return bearerToken.substring(tokenPrefix.length() + 1);
+        }
+        return null;
     }
 
     @Override
@@ -175,14 +193,6 @@ public class JwtServiceImpl implements JwtService {
         }
     }
 
-    @Override
-    public String getTokenFromRequest(HttpServletRequest request) {
-        String bearerToken = request.getHeader(header);
-        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith(tokenPrefix + " ")) {
-            return bearerToken.substring(tokenPrefix.length() + 1);
-        }
-        return null;
-    }
 
     @Override
     public String refreshAccessToken(String refreshToken) {

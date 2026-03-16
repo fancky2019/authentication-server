@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -20,10 +19,10 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_user")
 public class SysUser extends BaseEntity implements UserDetails {
-//    @TableField("role_code")
+    //    @TableField("role_code")
     private String username;
 
-//    @JsonIgnore
+    //    @JsonIgnore
     private String password;
 
     private String nickname;
@@ -35,14 +34,6 @@ public class SysUser extends BaseEntity implements UserDetails {
     private String avatar;
 
     private Integer gender;
-
-//    private Integer enabled;
-//
-//    private Integer accountNonExpired;
-//
-//    private Integer accountNonLocked;
-//
-//    private Integer credentialsNonExpired;
 
     @TableField(exist = false)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
@@ -95,23 +86,31 @@ public class SysUser extends BaseEntity implements UserDetails {
     @Setter
     @TableField("credentials_non_expired")
     private Boolean credentialsNonExpired = true;
+
     @Override
     public boolean isAccountNonExpired() {
-        return accountNonExpired ;
+        return accountNonExpired;
     }
 
     @Override
     public boolean isAccountNonLocked() {
-        return accountNonLocked ;
+        return accountNonLocked;
     }
 
     @Override
     public boolean isCredentialsNonExpired() {
-        return credentialsNonExpired ;
+        return credentialsNonExpired;
     }
 
     @Override
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public void clearSensitiveInformation() {
+        this.password = null;
+        this.roles = null;
+        this.permissions = null;
+        this.permissionPathList = null;
     }
 }

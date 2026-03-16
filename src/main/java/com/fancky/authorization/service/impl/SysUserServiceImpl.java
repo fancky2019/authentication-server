@@ -7,11 +7,12 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysUserMapper;
 import com.fancky.authorization.mapper.SysUserRoleMapper;
+import com.fancky.authorization.model.dto.CheckPermissionDto;
 import com.fancky.authorization.model.dto.UserDTO;
 import com.fancky.authorization.model.entity.*;
+import com.fancky.authorization.model.request.RefreshTokenRequest;
 import com.fancky.authorization.model.request.RegisterRequest;
 import com.fancky.authorization.model.response.PageVO;
-import com.fancky.authorization.model.response.SysUserResponse;
 import com.fancky.authorization.service.*;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
@@ -26,10 +27,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.servlet.http.HttpServletRequest;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -69,6 +73,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Autowired
     private SysPermissionService sysPermissionService;
 
+    @Autowired
+    private JwtService jwtService;
+
+
     @Override
     public SysUser getUserByUsername(String username) throws Exception {
         if (StringUtils.isEmpty(username)) {
@@ -90,6 +98,22 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 //                })
 //                .nullCacheTimeout(5, TimeUnit.MINUTES)               // 空值缓存5分钟
                 .execute();
+    }
+
+    @Override
+    public Map<String, String> refreshToken(RefreshTokenRequest request) throws Exception {
+
+        String refreshToken = request.getRefreshToken();
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            throw new Exception("刷新令牌不能为空");
+        }
+        String newAccessToken = jwtService.refreshAccessToken(refreshToken);
+        Map<String, String> result = new HashMap<>();
+        result.put("accessToken", newAccessToken);
+        result.put("tokenType", jwtService.getTokenPrefix());
+        result.put("expiresIn", String.valueOf(jwtService.getTokenExpiresIn(newAccessToken)));
+        return result;
+
     }
 
     @Override
@@ -413,6 +437,34 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
         int rows = sysUserMapper.batchUpdateEnabled(ids, enabled);
         return rows > 0;
+    }
+
+    @Override
+    public CheckPermissionDto checkPermission(CheckPermissionDto dto, HttpServletRequest request) throws Exception {
+        boolean hasPermission = false;
+        String username = this.jwtService.getUsername(request);
+
+        if (dto == null) {
+            dto = new CheckPermissionDto();
+            dto.setHasPermission(false);
+            return dto;
+        }
+        String superAdmin = "ROLE_SUPER_ADMIN";
+        SysUser sysUser = this.getUserWithRolesAndPermissions(username);
+        if (CollectionUtils.isNotEmpty(sysUser.getPermissionPathList()) &&
+                StringUtils.isNoneEmpty(dto.getPath())) {
+
+            if (sysUser.getRoles().contains(superAdmin)) {
+                hasPermission = true;
+            } else {
+                hasPermission = sysUser.getPermissionPathList().contains(dto.getPath());
+            }
+            if (hasPermission) {
+                sysUser.clearSensitiveInformation();
+                dto.setUser(sysUser);
+            }
+        }
+        return dto;
     }
 
 }

@@ -1,5 +1,6 @@
 package com.fancky.authorization.controller;
 
+import com.fancky.authorization.model.dto.CheckPermissionDto;
 import com.fancky.authorization.model.dto.UserDTO;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.request.ChangePasswordRequest;
@@ -29,7 +30,7 @@ public class UserController {
 
 
     @Autowired
-    private  JwtService jwtService;
+    private JwtService jwtService;
 
     /**
      * 登录实现在LoginFilter
@@ -51,27 +52,9 @@ public class UserController {
     }
 
     @PostMapping("/refresh")
-    public MessageResult<?> refreshToken(@RequestBody RefreshTokenRequest request) {
-
-        String refreshToken = request.getRefreshToken();
-        if (refreshToken == null || refreshToken.trim().isEmpty()) {
-            return MessageResult.faile(400, "刷新令牌不能为空");
-        }
-
-        try {
-            String newAccessToken = jwtService.refreshAccessToken(refreshToken);
-
-            Map<String, String> result = new HashMap<>();
-            result.put("accessToken", newAccessToken);
-            result.put("tokenType", jwtService.getTokenPrefix());
-            result.put("expiresIn", String.valueOf(jwtService.getTokenExpiresIn(newAccessToken)));
-
-            return MessageResult.success(result);
-        } catch (Exception e) {
-            return MessageResult.faile(401, "刷新令牌失败: " + e.getMessage());
-        }
+    public MessageResult<?> refreshToken(@RequestBody RefreshTokenRequest request) throws Exception {
+        return MessageResult.success(userService.refreshToken(request));
     }
-
 
 
     /**
@@ -91,7 +74,7 @@ public class UserController {
     }
 
     //    @PreAuthorize("isAuthenticated()")  // 明确需要认证
-    @GetMapping("/getCurrentUser")
+    @GetMapping("/current-user")
     public MessageResult<?> getCurrentUser(HttpServletRequest request) throws Exception {
         String token = jwtService.getTokenFromRequest(request);
 
@@ -287,4 +270,20 @@ public class UserController {
         userService.assignRoles(userId, roleIds);
         return MessageResult.success();
     }
+
+
+    //region  add
+
+    @PostMapping("/user-name")
+    public MessageResult<String> getUsername(HttpServletRequest request) {
+        return MessageResult.success(jwtService.getUsername(request));
+    }
+
+    @PostMapping("/check-permission")
+    public MessageResult<CheckPermissionDto> checkPermission(@RequestBody CheckPermissionDto dto, HttpServletRequest request) throws Exception {
+        return MessageResult.success(userService.checkPermission(dto, request));
+    }
+
+
+    //endregion
 }

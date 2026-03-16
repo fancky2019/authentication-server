@@ -14,7 +14,7 @@ import java.util.List;
  */
 @Data
 @Builder
-public class SysUserResponse extends BaseEntity {
+public class SysUserResponse extends BaseEntity  {
 
     private String accessToken;
     private String refreshToken;
