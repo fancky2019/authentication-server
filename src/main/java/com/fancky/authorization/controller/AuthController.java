@@ -108,7 +108,7 @@ public class AuthController {
             return MessageResult.faile(404, "用户不存在");
         }
 
-        return MessageResult.success(userService.convertToVO(user));
+        return MessageResult.success(user);
     }
 
     private String getCurrentUsername() {

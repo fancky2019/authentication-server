@@ -2,7 +2,7 @@ package com.fancky.authorization.filter;
 
 
 import com.fancky.authorization.model.request.LoginRequest;
-import com.fancky.authorization.model.response.LoginResponse;
+import com.fancky.authorization.model.response.SysUserResponse;
 import com.fancky.authorization.model.response.MessageResult;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.service.JwtService;
@@ -125,7 +125,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         /*
 
          */
-        LoginResponse loginResponse = LoginResponse.builder()
+        SysUserResponse loginResponse = SysUserResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .tokenType(jwtService.getTokenPrefix())

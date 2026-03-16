@@ -11,7 +11,7 @@ import com.fancky.authorization.model.dto.UserDTO;
 import com.fancky.authorization.model.entity.*;
 import com.fancky.authorization.model.request.RegisterRequest;
 import com.fancky.authorization.model.response.PageVO;
-import com.fancky.authorization.model.response.UserInfoVO;
+import com.fancky.authorization.model.response.SysUserResponse;
 import com.fancky.authorization.service.*;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
@@ -415,26 +415,4 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return rows > 0;
     }
 
-    @Override
-    public UserInfoVO convertToVO(SysUser user) {
-        if (user == null) {
-            return null;
-        }
-
-        UserInfoVO vo = new UserInfoVO();
-        vo.setId(user.getId());
-        vo.setUsername(user.getUsername());
-        vo.setNickname(user.getNickname());
-        vo.setEmail(user.getEmail());
-        vo.setPhone(user.getPhone());
-        vo.setAvatar(user.getAvatar());
-        vo.setGender(user.getGender());
-        vo.setRoles(user.getRoles());
-        vo.setPermissions(user.getPermissions());
-        vo.setPermissionPathList(user.getPermissionPathList());
-        vo.setLastLoginTime(user.getLastLoginTime());
-        vo.setCreateTime(user.getCreateTime());
-
-        return vo;
-    }
 }

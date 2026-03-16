@@ -9,7 +9,7 @@ import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.request.RegisterRequest;
 import com.fancky.authorization.model.response.PageVO;
-import com.fancky.authorization.model.response.UserInfoVO;
+import com.fancky.authorization.model.response.SysUserResponse;
 
 import java.util.List;
 
@@ -78,5 +78,4 @@ public interface SysUserService extends IService<SysUser> {
 
     boolean batchUpdateStatus(List<Long> ids, Integer enabled);
 
-    UserInfoVO convertToVO(SysUser user);
 }
