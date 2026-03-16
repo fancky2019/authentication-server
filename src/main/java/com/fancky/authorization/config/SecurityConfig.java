@@ -83,7 +83,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 objectMapper,
                 userService
         );
-        loginFilter.setFilterProcessesUrl("/api/auth/login");
+        loginFilter.setFilterProcessesUrl("/api/user/login");
         return loginFilter;
     }
 
@@ -102,14 +102,14 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
                 // 配置请求授权
                 .authorizeRequests()
                 // 允许访问的公共接口
-                .antMatchers("/api/auth/login").permitAll()
-                .antMatchers("/api/auth/register").permitAll()
-                .antMatchers("/api/auth/refresh").permitAll()
-                .antMatchers("/api/auth/forgot-password").permitAll()
-                .antMatchers("/api/auth/reset-password").permitAll()
+                .antMatchers("/api/user/login").permitAll()
+                .antMatchers("/api/user/register").permitAll()
+                .antMatchers("/api/user/refresh").permitAll()
+                .antMatchers("/api/user/forgot-password").permitAll()
+                .antMatchers("/api/user/reset-password").permitAll()
                 .antMatchers("/api/test/public").permitAll()
                 .antMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
-//                .antMatchers("/api/auth/getCurrentUser").permitAll()  // 临时放行
+//                .antMatchers("/api/user/getCurrentUser").permitAll()  // 临时放行
                 // 其他所有请求都需要认证
                 .anyRequest().authenticated()
                 .and()
