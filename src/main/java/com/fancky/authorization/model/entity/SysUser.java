@@ -23,7 +23,7 @@ public class SysUser extends BaseEntity implements UserDetails {
 //    @TableField("role_code")
     private String username;
 
-    @JsonIgnore
+//    @JsonIgnore
     private String password;
 
     private String nickname;
@@ -57,6 +57,9 @@ public class SysUser extends BaseEntity implements UserDetails {
 
     @TableField(exist = false)
     private List<String> permissions = new ArrayList<>();
+
+    @TableField(exist = false)
+    private List<String> permissionPathList = new ArrayList<>();
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

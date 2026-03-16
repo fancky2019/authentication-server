@@ -5,38 +5,32 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-
 import com.fancky.authorization.mapper.SysUserMapper;
 import com.fancky.authorization.mapper.SysUserRoleMapper;
 import com.fancky.authorization.model.dto.UserDTO;
-import com.fancky.authorization.model.entity.SysUser;
-import com.fancky.authorization.model.entity.SysUserRole;
+import com.fancky.authorization.model.entity.*;
 import com.fancky.authorization.model.request.RegisterRequest;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.model.response.UserInfoVO;
-import com.fancky.authorization.service.SysUserService;
+import com.fancky.authorization.service.*;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.extern.slf4j.Slf4j;
-import org.redisson.api.RLock;
+import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.serializer.RedisSerializer;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.apache.commons.lang3.StringUtils;
 
-
+import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -63,6 +57,17 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Autowired
     private RedisCacheService redisCacheService;
 
+    @Autowired
+    private SysUserRoleService sysUserRoleService;
+
+    @Autowired
+    private SysRoleService sysRoleService;
+
+    @Autowired
+    private SysRolePermissionService sysRolePermissionService;
+
+    @Autowired
+    private SysPermissionService sysPermissionService;
 
     @Override
     public SysUser getUserByUsername(String username) throws Exception {
@@ -245,9 +250,56 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
 
     @Override
-    public SysUser getUserWithRolesAndPermissions(String username) {
-        log.debug("查询用户信息: {}", username);
-        return sysUserMapper.selectUserWithRolesAndPermissions(username);
+    public SysUser getUserWithRolesAndPermissions(String username) throws Exception {
+//        log.debug("查询用户信息: {}", username);
+//        return sysUserMapper.selectUserWithRolesAndPermissions(username);
+        SysUser sysUser = getUserByUsername(username);
+        if (sysUser == null) {
+            String msg = MessageFormat.format("User {0} doesn't exist", username);
+            log.info(msg);
+            throw new Exception(msg);
+        }
+        List<SysUserRole> sysUserRoleList = this.sysUserRoleService.getUserRoles(sysUser.getId());
+
+        List<SysUserRole> userRoles = sysUserRoleService.getUserRoles(sysUser.getId());
+        if (CollectionUtils.isEmpty(userRoles)) {
+            log.info("username {} doesn't set role information", username);
+            return sysUser;
+        }
+
+        List<Long> roleIdList = userRoles.stream().filter(p -> p.getRoleId() != null).map(p -> p.getRoleId()).distinct().collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(roleIdList)) {
+            log.info("username {} doesn't set role information", username);
+            return sysUser;
+        }
+        List<SysRole> roleList = sysRoleService.getRoleByIds(roleIdList);
+        if (CollectionUtils.isEmpty(roleList)) {
+            String roleIdListStr = StringUtils.join(roleIdList, ",");
+            log.info("Can not get role information by id {}", roleIdListStr);
+            return sysUser;
+        }
+        List<String> roleCodeList = roleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
+        sysUser.setRoles(roleCodeList);
+
+        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+        if (CollectionUtils.isEmpty(sysRolePermissionList)) {
+            String roleIdListStr = StringUtils.join(roleIdList, ",");
+            log.info("Role {} don't set permission information", roleIdListStr);
+            return sysUser;
+        }
+        List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
+        List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
+        if (CollectionUtils.isEmpty(permissionList)) {
+            String sysPermissionIdListStr = StringUtils.join(sysPermissionIdList, ",");
+            log.info("Can not get permission information by id {}", sysPermissionIdListStr);
+            return sysUser;
+        }
+        List<String> permissionCodeList = permissionList.stream().map(p -> p.getPermissionCode()).distinct().collect(Collectors.toList());
+        sysUser.setPermissions(permissionCodeList);
+
+        List<String> permissionPathList = permissionList.stream().filter(p -> p.getPath() != null).map(p -> p.getPath()).distinct().collect(Collectors.toList());
+        sysUser.setPermissionPathList(permissionPathList);
+        return sysUser;
     }
 
     @Override
@@ -304,7 +356,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean changePassword(String username, String oldPassword, String newPassword) {
+    public boolean changePassword(String username, String oldPassword, String newPassword) throws Exception {
         SysUser user = this.getUserWithRolesAndPermissions(username);
         if (user == null) {
             throw new RuntimeException("用户不存在");
@@ -379,6 +431,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         vo.setGender(user.getGender());
         vo.setRoles(user.getRoles());
         vo.setPermissions(user.getPermissions());
+        vo.setPermissionPathList(user.getPermissionPathList());
         vo.setLastLoginTime(user.getLastLoginTime());
         vo.setCreateTime(user.getCreateTime());
 

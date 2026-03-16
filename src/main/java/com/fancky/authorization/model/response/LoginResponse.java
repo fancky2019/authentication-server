@@ -5,9 +5,13 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+/**
+ * 登录成功返回的消息体
+ */
 @Data
 @Builder
 public class LoginResponse {
@@ -23,6 +27,7 @@ public class LoginResponse {
     private String avatar;
     private List<String> roles;
     private List<String> permissions;
+    private List<String> permissionPathList;
     private Long expiresIn;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

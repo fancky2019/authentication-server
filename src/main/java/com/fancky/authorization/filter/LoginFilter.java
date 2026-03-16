@@ -122,6 +122,9 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
         String accessToken = jwtService.generateAccessToken(user);
         String refreshToken = jwtService.generateRefreshToken(user);
 
+        /*
+
+         */
         LoginResponse loginResponse = LoginResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -134,6 +137,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter {
                 .avatar(user.getAvatar())
                 .roles(user.getRoles())
                 .permissions(user.getPermissions())
+                .permissionPathList(user.getPermissionPathList())
                 .expiresIn(jwtService.getTokenExpiresIn(accessToken))
                 .loginTime(new Date())
                 .build();

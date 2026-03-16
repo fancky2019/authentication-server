@@ -74,6 +74,7 @@ public class JwtServiceImpl implements JwtService {
         claims.put("nickname", user.getNickname());
         claims.put("roles", user.getRoles());
         claims.put("permissions", user.getPermissions());
+        claims.put("permissionPathList", user.getPermissionPathList());
         claims.put("type", "access");
 
         String token = Jwts.builder()

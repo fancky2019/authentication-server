@@ -20,7 +20,9 @@ public interface SysUserService extends IService<SysUser> {
      * 根据用户名查询用户
      */
     SysUser getUserByUsername(String username) throws Exception;
+
     SysUser getUserById(Long id) throws Exception;
+
     /**
      * 分页查询用户列表
      */
@@ -62,13 +64,13 @@ public interface SysUserService extends IService<SysUser> {
     boolean assignRoles(Long userId, Long[] roleIds);
 
 
-    SysUser getUserWithRolesAndPermissions(String username);
+    SysUser getUserWithRolesAndPermissions(String username) throws Exception;
 
     boolean register(RegisterRequest registerRequest);
 
     void updateLastLoginTime(String username);
 
-    boolean changePassword(String username, String oldPassword, String newPassword);
+    boolean changePassword(String username, String oldPassword, String newPassword) throws Exception;
 
     boolean resetPassword(String username, String newPassword);
 

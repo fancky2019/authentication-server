@@ -29,17 +29,19 @@ public class AuthController {
     private final SysUserService userService;
     private final JwtService jwtService;
 
+    /**
+     * 登录实现在LoginFilter
+     * @return
+     */
     @PostMapping("/login")
     public MessageResult<?> login() {
-        return MessageResult.faile("请使用POST方式提交登录表单");
+        return MessageResult.faile("login fail");
     }
 
     @PostMapping("/register")
     public MessageResult<?> register(@Valid @RequestBody RegisterRequest registerRequest) {
         log.info("收到注册请求: {}", registerRequest.getUsername());
-
         boolean success = userService.register(registerRequest);
-
         if (success) {
             return MessageResult.success("注册成功");
         } else {
@@ -92,7 +94,7 @@ public class AuthController {
 
 //    @PreAuthorize("isAuthenticated()")  // 明确需要认证
     @GetMapping("/getCurrentUser")
-    public MessageResult<?> getCurrentUser(HttpServletRequest request) {
+    public MessageResult<?> getCurrentUser(HttpServletRequest request) throws Exception {
         String token = jwtService.getTokenFromRequest(request);
 
         if (token == null) {
@@ -179,7 +181,7 @@ public class AuthController {
     }
 
     @GetMapping("/verify")
-    public MessageResult<?> verifyToken(HttpServletRequest request) {
+    public MessageResult<?> verifyToken(HttpServletRequest request) throws Exception {
         String token = jwtService.getTokenFromRequest(request);
 
         if (token == null) {

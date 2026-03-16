@@ -32,7 +32,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         log.debug("正在加载用户: {}", username);
 
-        SysUser user = sysUserService.getUserWithRolesAndPermissions(username);
+        SysUser user = null;
+        try {
+            user = sysUserService.getUserWithRolesAndPermissions(username);
+        } catch (Exception e) {
+            throw new UsernameNotFoundException("用户不存在: " + username);
+        }
 
         if (user == null) {
             log.warn("用户不存在: {}", username);
@@ -44,17 +49,6 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             throw new UsernameNotFoundException("用户已被禁用: " + username);
         }
 
-        List<String> roles = new ArrayList<>();
-        roles.add("roles1");
-        roles.add("roles2");
-        roles.add("roles3");
-        List<String> permissions = new ArrayList<>();
-        permissions.add("permissions1");
-        permissions.add("permissions2");
-        permissions.add("permissions3");
-        permissions.add("getCurrentUser");
-        user.setRoles(roles);
-        user.setPermissions(permissions);
         log.debug("用户加载成功: {}, 角色: {}, 权限: {}",
                 username, user.getRoles(), user.getPermissions());
 
