@@ -6,12 +6,15 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.fancky.authorization.model.dto.CheckPermissionDto;
 import com.fancky.authorization.model.dto.UserDTO;
+import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.request.RefreshTokenRequest;
 import com.fancky.authorization.model.request.RegisterRequest;
+import com.fancky.authorization.model.response.MessageResult;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.model.response.SysUserResponse;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import javax.servlet.http.HttpServletRequest;
@@ -20,7 +23,7 @@ import java.util.Map;
 
 
 public interface SysUserService extends IService<SysUser> {
-
+    void initUser();
     /**
      * 根据用户名查询用户
      */
@@ -87,4 +90,8 @@ public interface SysUserService extends IService<SysUser> {
 
 
     CheckPermissionDto checkPermission(CheckPermissionDto dto, HttpServletRequest request) throws Exception;
+
+    List<SysPermission> permission(Long userId) throws Exception;
+
+
 }

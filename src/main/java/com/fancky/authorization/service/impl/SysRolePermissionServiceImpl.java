@@ -3,10 +3,15 @@ package com.fancky.authorization.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fancky.authorization.mapper.SysPermissionMapper;
 import com.fancky.authorization.mapper.SysRolePermissionMapper;
+import com.fancky.authorization.model.dto.PermissionAssignDTO;
 import com.fancky.authorization.model.dto.RolePermissionDto;
+import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
+import com.fancky.authorization.model.entity.SysUser;
+import com.fancky.authorization.service.SysPermissionService;
 import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
@@ -15,20 +20,26 @@ import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionMapper, SysRolePermission>
         implements SysRolePermissionService {
+
+    @Autowired
+    private SysPermissionService sysPermissionService;
 
     @Autowired
     private SysRolePermissionMapper rolePermissionMapper;
@@ -111,6 +122,74 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
     }
 
     @Override
+    public List<SysRolePermission> getRolePermissions() {
+        Map<String, SysRolePermission> rolePermissionMap = this.redisUtil.getHash(RedisKey.ROLE_PERMISSION_KEY, SysRolePermission.class);
+        if (MapUtils.isEmpty(rolePermissionMap)) {
+            initRolePermission();
+        }
+        return new ArrayList<>(rolePermissionMap.values());
+    }
+
+    @Override
+    public void initRolePermission() {
+        log.info("start init RolePermission");
+
+        long startTime = System.currentTimeMillis();
+
+        // 1. 清理缓存（使用pipe删除多个key）
+        redisTemplate.delete(Arrays.asList(
+                RedisKey.ROLE_PERMISSION_KEY,
+                RedisKey.ROLE_PERMISSION_ROLE_KEY
+        ));
+        log.info("RolePermission Cache cleared");
+
+        // 2. 查询所有角色权限关系
+        List<SysRolePermission> list = this.list();
+
+        if (CollectionUtils.isEmpty(list)) {
+            log.warn("No role permission data found");
+            return;
+        }
+
+        // 3. 存储原始数据（按ID索引）
+        Map<String, SysRolePermission> idMap = list.stream()
+                .collect(Collectors.toMap(
+                        p -> p.getId().toString(),
+                        Function.identity(),
+                        (v1, v2) -> v1  // 如果有重复，保留第一个
+                ));
+
+        redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_KEY, idMap);
+        log.info("RolePermission data cached, size: {}", idMap.size());
+
+        // 4. 使用Stream分组，构建角色-权限映射
+        Map<String, List<SysRolePermission>> rolePermissionMap = list.stream()
+                .collect(Collectors.groupingBy(
+                        rp -> rp.getRoleId().toString(),
+                        HashMap::new,
+                        Collectors.toList() // Collectors.toCollection(HashSet::new)
+                ));
+
+
+        // 6. 批量存入Redis
+        if (!rolePermissionMap.isEmpty()) {
+            redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_ROLE_KEY, rolePermissionMap);
+            log.info("Role-Permission mapping cached, role count: {}", rolePermissionMap.size());
+        }
+
+
+        //取值
+//        Object obj = redisTemplate.opsForHash().get(RedisKey.ROLE_PERMISSION_ROLE_KEY, key);
+//        if (obj instanceof Set) {
+//            Set<Long> data = (Set<Long>) obj;
+//        }
+
+        long cost = System.currentTimeMillis() - startTime;
+        log.info("init RolePermission complete, total records: {}, cost: {}ms",
+                list.size(), cost);
+    }
+
+    @Override
     public List<Long> getRoleIdsByPermissionId(Long permissionId) {
         return rolePermissionMapper.selectRoleIdsByPermissionId(permissionId);
     }
@@ -138,36 +217,83 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
         return rolePermissionMapper.insertBatch(rolePermissions) > 0;
     }
 
+
+
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean addRolePermission(RolePermissionDto dto) throws Exception {
-        // 删除权限原有的角色关联
-//        rolePermissionMapper.deleteByPermissionId(permissionId);
+    public void assignPermissions(PermissionAssignDTO assignDTO) throws Exception {
+        Long roleId = assignDTO.getRoleId();
+        List<Long> selectedPermissionIds = assignDTO.getPermissionIds();
 
-        Long permissionId = dto.getPermissionId();
-        List<Long> roleIds = dto.getRoleIds();
-        if (CollectionUtils.isEmpty(roleIds)) {
-            return false;
+        log.info("开始为角色[{}]分配权限，选中权限数量: {}", roleId, selectedPermissionIds == null ? 0 : selectedPermissionIds.size());
+
+        // 1. 参数校验
+        if (roleId == null) {
+            throw new Exception("role is null");
         }
-        redisTemplate.delete(Arrays.asList(
-                RedisKey.ROLE_PERMISSION_KEY,
-                RedisKey.ROLE_PERMISSION_ROLE_KEY
-        ));
-        // 创建新的角色关联
-        List<SysRolePermission> rolePermissions = roleIds.stream()
-                .map(roleId -> {
-                    SysRolePermission rolePermission = new SysRolePermission();
-                    rolePermission.setRoleId(roleId);
-                    rolePermission.setPermissionId(permissionId);
-                    return rolePermission;
-                })
-                .collect(Collectors.toList());
 
-        boolean success = this.saveBatch(rolePermissions);
+        if (CollectionUtils.isEmpty(selectedPermissionIds)) {
+            throw new Exception("permission is null");
+        }
+//        // 2. 获取所有权限数据（用于计算完整路径）
+//        List<SysPermission> allPermissions = sysPermissionService.list();
+//        if (CollectionUtils.isEmpty(allPermissions)) {
+//            log.warn("权限表为空");
+//            return;
+//        }
+//
+//        // 3. 构建权限映射
+//        Map<Long, SysPermission> permissionMap = allPermissions.stream()
+//                .collect(Collectors.toMap(SysPermission::getId, p -> p));
+
+        Map<String, SysPermission> permissionMap = this.redisUtil.getHash(RedisKey.PERMISSION_KEY, SysPermission.class);
+        // 4. 计算完整的权限集合（包含所有父级）
+        Set<Long> completePermissionIds = calculateCompletePermissionSet(
+                selectedPermissionIds, permissionMap);
+
+        log.info("计算后的完整权限数量: {}", completePermissionIds.size());
+
+        // 5. 获取角色当前已有的权限
+//        Map<String, SysRolePermission> rolePermissionMap = this.redisUtil.getHash(RedisKey.ROLE_PERMISSION_KEY, SysRolePermission.class);
+//        List<SysRolePermission> rolePermissionList =
+//                rolePermissionMap.values().stream().filter(p -> p.getRoleId().equals(roleId)).collect(Collectors.toList());
+        List<SysRolePermission> rolePermissionList = this.getPermissionsByRoleIds(Arrays.asList(roleId));
+//        List<SysRolePermission> rolePermissionList = (List<SysRolePermission>) this.redisTemplate.opsForHash().get(RedisKey.ROLE_PERMISSION_ROLE_KEY, roleId.toString());
+        List<Long> existingPermissionIds = rolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
+        Set<Long> existingSet = new HashSet<>(existingPermissionIds);
+
+        // 6. 计算需要新增和删除的权限
+        Set<Long> toAdd = completePermissionIds.stream()
+                .filter(id -> !existingSet.contains(id))
+                .collect(Collectors.toSet());
+
+        Set<Long> toRemove = existingSet.stream()
+                .filter(id -> !completePermissionIds.contains(id))
+                .collect(Collectors.toSet());
+
+        log.info("需要新增权限: {}, 需要移除权限: {}", toAdd.size(), toRemove.size());
+
+        // 7. 批量新增
+        if (!toAdd.isEmpty()) {
+            List<SysRolePermission> addList = buildRolePermissions(roleId, toAdd, permissionMap);
+            this.saveBatch(addList);
+        }
+
+        // 8. 批量删除
+        if (!toRemove.isEmpty()) {
+            List<Long> toRemoveRolePermissionId =rolePermissionList.stream().filter(p -> p.getRoleId().equals(roleId) &&
+                    toRemove.contains(p.getPermissionId())
+            ).map(p -> p.getId()).collect(Collectors.toList());
+
+//            rolePermissionMapper.batchDeleteByRoleIdAndPermissionIds(roleId,
+//                    new ArrayList<>(toRemove));
+            boolean deletedSuccess = this.removeByIds(toRemoveRolePermissionId);
+            int n = 0;
+        }
         // 3. 注册事务回调 - 方式1：链式调用
         callbackManager.register()
 //                .releaseLock(lock, lockSuccessfully)
-                .deleteCache(RedisKey.PERMISSION_KEY)
+                .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
                 .onCommit(() -> {
                     // 事务提交后，可以发送MQ消息通知其他服务
                     // log.info("Permission added, sending notification...");
@@ -178,8 +304,98 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
                     // log.warn("Permission addition rolled back");
                 })
                 .execute();
-        return success;
+        log.info("角色[{}]权限分配完成", roleId);
     }
+
+    /**
+     * 计算完整的权限集合（包含所有父级）
+     */
+    private Set<Long> calculateCompletePermissionSet(List<Long> selectedPermissionIds,
+                                                     Map<String, SysPermission> permissionMap) {
+        Set<Long> completeSet = new HashSet<>();
+
+        if (CollectionUtils.isEmpty(selectedPermissionIds)) {
+            return completeSet;
+        }
+
+        // 对每个选中的权限，递归添加其所有父级
+        for (Long permissionId : selectedPermissionIds) {
+            addPermissionAndParents(permissionId, permissionMap, completeSet);
+        }
+
+        return completeSet;
+    }
+
+
+    /**
+     * 递归添加权限及其所有父级
+     */
+    private void addPermissionAndParents(Long permissionId,
+                                         Map<String, SysPermission> permissionMap,
+                                         Set<Long> collector) {
+        if (permissionId == null || permissionId == 0) {
+            return;
+        }
+
+        // 添加当前权限
+        collector.add(permissionId);
+
+        // 递归添加父级
+        SysPermission permission = permissionMap.get(permissionId);
+        if (permission != null && permission.getParentId() != null && permission.getParentId() != 0) {
+            addPermissionAndParents(permission.getParentId(), permissionMap, collector);
+        }
+    }
+
+    /**
+     * 构建角色权限关联对象列表
+     */
+    private List<SysRolePermission> buildRolePermissions(Long roleId,
+                                                         Set<Long> permissionIds,
+                                                         Map<String, SysPermission> permissionMap) {
+        List<SysRolePermission> rolePermissions = new ArrayList<>();
+
+        for (Long permissionId : permissionIds) {
+            SysPermission permission = permissionMap.get(permissionId.toString());
+            if (permission == null) {
+                log.warn("权限[{}]不存在，跳过", permissionId);
+                continue;
+            }
+
+            SysRolePermission rp = new SysRolePermission();
+            rp.setRoleId(roleId);
+            rp.setPermissionId(permissionId);
+            rp.setPermissionType(permission.getPermissionType());
+
+            // 计算权限路径和层级
+//            String path = calculatePermissionPath(permissionId, permissionMap);
+//            rp.setPermissionPath(path);
+//            rp.setPermissionLevel(path.split("-").length);
+
+            rolePermissions.add(rp);
+        }
+
+        return rolePermissions;
+    }
+
+    /**
+     * 计算权限路径（格式：父ID-子ID）
+     */
+    private String calculatePermissionPath(Long permissionId,
+                                           Map<String, SysPermission> permissionMap) {
+        List<String> pathSegments = new ArrayList<>();
+        Long currentId = permissionId;
+
+        while (currentId != null && currentId != 0) {
+            pathSegments.add(String.valueOf(currentId));
+            SysPermission permission = permissionMap.get(currentId.toString());
+            currentId = permission != null ? permission.getParentId() : null;
+        }
+
+        Collections.reverse(pathSegments);
+        return String.join("-", pathSegments);
+    }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)

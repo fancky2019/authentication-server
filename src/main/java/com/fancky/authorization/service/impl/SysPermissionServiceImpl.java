@@ -49,6 +49,25 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     private TransactionCallbackManager callbackManager;
 
     @Override
+    public void initPermission() {
+        log.info("start init Permission");
+        redisTemplate.delete(RedisKey.PERMISSION_KEY);
+        log.info("delete Permission complete");
+        List<SysPermission> list = this.list();
+        Map<String, SysPermission> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
+        redisTemplate.opsForHash().putAll(RedisKey.PERMISSION_KEY, map);
+        log.info("init Permission complete");
+    }
+
+
+
+
+
+
+
+
+
+    @Override
     public List<SysPermission> getPermissionTree() {
         List<SysPermission> permissions = permissionMapper.selectList(
                 new LambdaQueryWrapper<SysPermission>()

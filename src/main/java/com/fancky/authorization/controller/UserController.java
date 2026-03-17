@@ -2,6 +2,7 @@ package com.fancky.authorization.controller;
 
 import com.fancky.authorization.model.dto.CheckPermissionDto;
 import com.fancky.authorization.model.dto.UserDTO;
+import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.model.request.ChangePasswordRequest;
 import com.fancky.authorization.model.request.RefreshTokenRequest;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -285,5 +287,9 @@ public class UserController {
     }
 
 
+    @GetMapping("/permission/{id}")
+    public MessageResult<List<SysPermission>> permission(@PathVariable("id") Long userId) throws Exception {
+        return MessageResult.success(userService.permission(userId ));
+    }
     //endregion
 }

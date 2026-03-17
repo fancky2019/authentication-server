@@ -9,6 +9,8 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 @TableName("sys_role_permission")
 public class SysRolePermission extends BaseEntity {
+    //重写 覆盖父类的    @TableLogic
+//    private Integer deleted;
     @TableField("role_id")
     private Long roleId;
     @TableField("permission_id")

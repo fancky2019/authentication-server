@@ -9,7 +9,7 @@ import com.fancky.authorization.model.entity.SysPermission;
 import java.util.List;
 
 public interface SysPermissionService extends IService<SysPermission> {
-
+    void initPermission();
     /**
      * 获取权限树
      */

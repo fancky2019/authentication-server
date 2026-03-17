@@ -11,6 +11,7 @@ import com.fancky.authorization.model.dto.RoleDTO;
 import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
+import com.fancky.authorization.model.entity.SysUserRole;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysRoleService;
 import com.fancky.authorization.utility.RedisKey;
@@ -28,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -48,6 +50,19 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Autowired
     private RedisUtil redisUtil;
+
+
+    @Override
+    public void initRole() {
+        log.info("start init Role");
+        redisTemplate.delete(RedisKey.ROLE_KEY);
+        log.info("delete Role complete");
+        List<SysRole> list = this.list();
+        Map<String, SysRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
+        redisTemplate.opsForHash().putAll(RedisKey.ROLE_KEY, map);
+        log.info("init Role complete");
+    }
+
     @Override
     public PageVO<SysRole> getRolePage(RoleDTO roleDTO) {
         Page<SysRole> page = new Page<>(roleDTO.getCurrent(), roleDTO.getSize());

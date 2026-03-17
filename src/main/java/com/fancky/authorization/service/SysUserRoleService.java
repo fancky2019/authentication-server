@@ -7,7 +7,7 @@ import com.fancky.authorization.model.entity.SysUserRole;
 import java.util.List;
 
 public interface SysUserRoleService extends IService<SysUserRole> {
-
+    void initUserRole();
     /**
      * 根据用户ID获取角色ID列表
      */

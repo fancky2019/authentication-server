@@ -9,7 +9,7 @@ import java.util.List;
 
 
 public interface SysRoleService extends IService<SysRole> {
-
+    void initRole();
     /**
      * 分页查询角色列表
      */

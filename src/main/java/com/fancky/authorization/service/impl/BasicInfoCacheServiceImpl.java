@@ -79,178 +79,15 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
 //        int m = 0;
     }
 
-    @Override
-    public void initUser() {
-        log.info("start init User");
-        redisTemplate.delete(RedisKey.USER_KEY);
-        log.info("delete User complete");
-        List<SysUser> list = this.sysUserService.list();
-
-        Map<String, SysUser> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        //redis key  都是string
-        HashOperations<String, String, SysUser> hashOps = redisTemplate.opsForHash();
-        hashOps.putAll(RedisKey.USER_KEY, map);
-
-        Map<String, SysUser> codeKeyMap = list.stream().collect(Collectors.toMap(p -> p.getUsername(), p -> p));
-        //redis key  都是string
-        hashOps.putAll(RedisKey.USER_CODE_KEY, codeKeyMap);
-
-        log.info("init location complete");
-    }
-
-
-    @Override
-    public void initRole() {
-        log.info("start init Role");
-        redisTemplate.delete(RedisKey.ROLE_KEY);
-        log.info("delete Role complete");
-        List<SysRole> list = this.sysRoleService.list();
-        Map<String, SysRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(RedisKey.ROLE_KEY, map);
-        log.info("init Role complete");
-    }
-
-    @Override
-    public void initUserRole() {
-//        log.info("start init UserRole");
-//        redisTemplate.delete(RedisKey.USER_ROLE_KEY);
-//        log.info("delete UserRole complete");
-//        List<SysUserRole> list = this.sysUserRoleService.list();
-//        Map<String, SysUserRole> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-//        redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_KEY, map);
-//        log.info("init UserRole complete");
-
-
-        log.info("start init UserRole");
-
-        long startTime = System.currentTimeMillis();
-
-        // 1. 清理缓存（使用pipe删除多个key）
-        redisTemplate.delete(Arrays.asList(
-                RedisKey.USER_ROLE_KEY,
-                RedisKey.USER_ROLE_USER_KEY
-        ));
-        log.info("SysUserRole Cache cleared");
-
-        // 2. 查询所有角色权限关系
-        List<SysUserRole> list = this.sysUserRoleService.list();
-
-        if (CollectionUtils.isEmpty(list)) {
-            log.warn("No SysUserRole data found");
-            return;
-        }
-
-        // 3. 存储原始数据（按ID索引）
-        Map<String, SysUserRole> idMap = list.stream()
-                .collect(Collectors.toMap(
-                        p -> p.getId().toString(),
-                        Function.identity(),
-                        (v1, v2) -> v1  // 如果有重复，保留第一个
-                ));
-
-        redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_KEY, idMap);
-        log.info("SysUserRole data cached, size: {}", idMap.size());
-
-        // 4. 使用Stream分组，构建角色-权限映射
-//        //set
-//        Map<String, Set<SysUserRole>> userIdKeyMap = list.stream()
-//                .collect(Collectors.groupingBy(
-//                        rp -> rp.getUserId().toString(),
-//                        HashMap::new,
-//                        Collectors.toCollection(HashSet::new)
-//                ));
-
-        //List
-        Map<String, List<SysUserRole>> userIdKeyMap = list.stream()
-                .collect(Collectors.groupingBy(
-                        rp -> rp.getUserId().toString(),
-                        HashMap::new,
-                        Collectors.toList()  // 改为 toList()，生成 ArrayList
-                ));
-
-        // 6. 批量存入Redis
-        if (!userIdKeyMap.isEmpty()) {
-            redisTemplate.opsForHash().putAll(RedisKey.USER_ROLE_USER_KEY, userIdKeyMap);
-            log.info("SysUserRole mapping cached, role count: {}", userIdKeyMap.size());
-        }
-
-        long cost = System.currentTimeMillis() - startTime;
-        log.info("init SysUserRole complete, total records: {}, cost: {}ms",
-                list.size(), cost);
-    }
-
-
-    @Override
-    public void initPermission() {
-        log.info("start init Permission");
-        redisTemplate.delete(RedisKey.PERMISSION_KEY);
-        log.info("delete Permission complete");
-        List<SysPermission> list = this.sysPermissionService.list();
-        Map<String, SysPermission> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
-        redisTemplate.opsForHash().putAll(RedisKey.PERMISSION_KEY, map);
-        log.info("init Permission complete");
-    }
-
-    @Override
-    public void initRolePermission() {
-        log.info("start init RolePermission");
-
-        long startTime = System.currentTimeMillis();
-
-        // 1. 清理缓存（使用pipe删除多个key）
-        redisTemplate.delete(Arrays.asList(
-                RedisKey.ROLE_PERMISSION_KEY,
-                RedisKey.ROLE_PERMISSION_ROLE_KEY
-        ));
-        log.info("RolePermission Cache cleared");
-
-        // 2. 查询所有角色权限关系
-        List<SysRolePermission> list = this.sysRolePermissionService.list();
-
-        if (CollectionUtils.isEmpty(list)) {
-            log.warn("No role permission data found");
-            return;
-        }
-
-        // 3. 存储原始数据（按ID索引）
-        Map<String, SysRolePermission> idMap = list.stream()
-                .collect(Collectors.toMap(
-                        p -> p.getId().toString(),
-                        Function.identity(),
-                        (v1, v2) -> v1  // 如果有重复，保留第一个
-                ));
-
-        redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_KEY, idMap);
-        log.info("RolePermission data cached, size: {}", idMap.size());
-
-        // 4. 使用Stream分组，构建角色-权限映射
-        Map<String, List<SysRolePermission>> rolePermissionMap = list.stream()
-                .collect(Collectors.groupingBy(
-                        rp -> rp.getRoleId().toString(),
-                        HashMap::new,
-                        Collectors.toList() // Collectors.toCollection(HashSet::new)
-                ));
 
 
 
-        // 6. 批量存入Redis
-        if (!rolePermissionMap.isEmpty()) {
-            redisTemplate.opsForHash().putAll(RedisKey.ROLE_PERMISSION_ROLE_KEY, rolePermissionMap);
-            log.info("Role-Permission mapping cached, role count: {}", rolePermissionMap.size());
-        }
 
 
 
-        //取值
-//        Object obj = redisTemplate.opsForHash().get(RedisKey.ROLE_PERMISSION_ROLE_KEY, key);
-//        if (obj instanceof Set) {
-//            Set<Long> data = (Set<Long>) obj;
-//        }
 
-        long cost = System.currentTimeMillis() - startTime;
-        log.info("init RolePermission complete, total records: {}, cost: {}ms",
-                list.size(), cost);
-    }
+
+
 
 
 //    @Override
@@ -342,11 +179,11 @@ public class BasicInfoCacheServiceImpl implements BasicInfoCacheService {
         log.info("start initBasicInfoCache");
         BasicInfoCacheService basicInfoCacheService = applicationContext.getBean(BasicInfoCacheService.class);
 
-        CompletableFuture<Void> initUserFuture = CompletableFuture.runAsync(basicInfoCacheService::initUser, threadPoolExecutor);
-        CompletableFuture<Void> initRoleFuture = CompletableFuture.runAsync(basicInfoCacheService::initRole, threadPoolExecutor);
-        CompletableFuture<Void> initUserRoleFuture = CompletableFuture.runAsync(basicInfoCacheService::initUserRole, threadPoolExecutor);
-        CompletableFuture<Void> initPermissionFuture = CompletableFuture.runAsync(basicInfoCacheService::initPermission, threadPoolExecutor);
-        CompletableFuture<Void> initRolePermissionFuture = CompletableFuture.runAsync(basicInfoCacheService::initRolePermission, threadPoolExecutor);
+        CompletableFuture<Void> initUserFuture = CompletableFuture.runAsync(()->this.sysUserService.initUser(), threadPoolExecutor);
+        CompletableFuture<Void> initRoleFuture = CompletableFuture.runAsync(()->this.sysRoleService.initRole(), threadPoolExecutor);
+        CompletableFuture<Void> initUserRoleFuture = CompletableFuture.runAsync(()->this.sysUserRoleService.initUserRole(), threadPoolExecutor);
+        CompletableFuture<Void> initPermissionFuture = CompletableFuture.runAsync(()->this.sysPermissionService.initPermission(), threadPoolExecutor);
+        CompletableFuture<Void> initRolePermissionFuture = CompletableFuture.runAsync(()->this.sysRolePermissionService.initRolePermission(), threadPoolExecutor);
 
         // 等待所有任务完成
         CompletableFuture<Void> allFutures = CompletableFuture.allOf(

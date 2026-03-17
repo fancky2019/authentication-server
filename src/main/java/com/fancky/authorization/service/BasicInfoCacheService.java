@@ -6,18 +6,13 @@ public interface BasicInfoCacheService {
 
     void initBasicInfoCache();
 
-    void initUser();
-
-    void initRole();
-
-    void initUserRole();
-
-    void initPermission();
-
-    void initRolePermission();
-
-
-
+//    void initUser();
+//
+//    void initRole();
+//
+//    void initUserRole();
+//
+//    void initPermission();
 
 
     boolean getSbpEnable();

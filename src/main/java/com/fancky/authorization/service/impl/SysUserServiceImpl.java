@@ -22,6 +22,7 @@ import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -30,10 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.servlet.http.HttpServletRequest;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -76,6 +74,24 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Autowired
     private JwtService jwtService;
 
+    @Override
+    public void initUser() {
+        log.info("start init User");
+        redisTemplate.delete(RedisKey.USER_KEY);
+        log.info("delete User complete");
+        List<SysUser> list = this.list();
+
+        Map<String, SysUser> map = list.stream().collect(Collectors.toMap(p -> p.getId().toString(), p -> p));
+        //redis key  都是string
+        HashOperations<String, String, SysUser> hashOps = redisTemplate.opsForHash();
+        hashOps.putAll(RedisKey.USER_KEY, map);
+
+        Map<String, SysUser> codeKeyMap = list.stream().collect(Collectors.toMap(p -> p.getUsername(), p -> p));
+        //redis key  都是string
+        hashOps.putAll(RedisKey.USER_CODE_KEY, codeKeyMap);
+
+        log.info("init location complete");
+    }
 
     @Override
     public SysUser getUserByUsername(String username) throws Exception {
@@ -467,4 +483,88 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return dto;
     }
 
+    @Override
+    public List<SysPermission> permission(Long userId) throws Exception {
+        SysUser sysUser = getUserById(userId);
+        if (sysUser == null) {
+            String msg = MessageFormat.format("User {0} doesn't exist", userId);
+            log.info(msg);
+            throw new Exception(msg);
+        }
+        List<SysUserRole> sysUserRoleList = this.sysUserRoleService.getUserRoles(sysUser.getId());
+
+        List<SysUserRole> userRoles = sysUserRoleService.getUserRoles(sysUser.getId());
+        if (CollectionUtils.isEmpty(userRoles)) {
+            log.info("user {} doesn't set role information", userId);
+            return Collections.emptyList();
+        }
+
+        List<Long> roleIdList = userRoles.stream().filter(p -> p.getRoleId() != null).map(p -> p.getRoleId()).distinct().collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(roleIdList)) {
+            log.info("user {} doesn't set role information", userId);
+            return Collections.emptyList();
+        }
+        List<SysRole> roleList = sysRoleService.getRoleByIds(roleIdList);
+        if (CollectionUtils.isEmpty(roleList)) {
+            String roleIdListStr = StringUtils.join(roleIdList, ",");
+            log.info("Can not get role information by id {}", roleIdListStr);
+            return Collections.emptyList();
+        }
+        List<String> roleCodeList = roleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
+        sysUser.setRoles(roleCodeList);
+
+        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+        if (CollectionUtils.isEmpty(sysRolePermissionList)) {
+            String roleIdListStr = StringUtils.join(roleIdList, ",");
+            log.info("Role {} don't set permission information", roleIdListStr);
+            return Collections.emptyList();
+        }
+        List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
+        List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
+        if (CollectionUtils.isEmpty(permissionList)) {
+            String sysPermissionIdListStr = StringUtils.join(sysPermissionIdList, ",");
+            log.info("Can not get permission information by id {}", sysPermissionIdListStr);
+            return Collections.emptyList();
+        }
+        Long parentId = permissionList.stream()
+                .map(SysPermission::getParentId)
+                .filter(Objects::nonNull)
+                .min(Long::compareTo)
+                .orElse(null);
+        List<SysPermission> treePermissionList = getFullTree(permissionList);
+        return treePermissionList;
+    }
+
+    /**
+     * 获取完整的权限树（包含所有层级）
+     * @param permissions 所有权限列表
+     * @return 完整的树形结构（根节点列表）
+     */
+    public List<SysPermission> getFullTree(List<SysPermission> permissions) {
+        if (CollectionUtils.isEmpty(permissions)) {
+            return Collections.emptyList();
+        }
+
+        // 找到所有根节点（parentId为null或0的节点）
+        List<SysPermission> roots = permissions.stream()
+                .filter(p -> p.getParentId() == null || p.getParentId() == 0)
+                .collect(Collectors.toList());
+
+        // 为每个根节点递归构建子节点
+        roots.forEach(root ->
+                root.setChildren(buildChildren(permissions, root.getId()))
+        );
+
+        return roots;
+    }
+
+    /**
+     * 递归构建子节点（私有方法）
+     */
+    private List<SysPermission> buildChildren(List<SysPermission> permissions, Long parentId) {
+        return permissions.stream()
+                .filter(p -> parentId.equals(p.getParentId()))
+                .peek(p -> p.setChildren(buildChildren(permissions, p.getId())))
+                .collect(Collectors.toList());
+    }
 }

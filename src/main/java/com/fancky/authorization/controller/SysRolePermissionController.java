@@ -1,5 +1,6 @@
 package com.fancky.authorization.controller;
 
+import com.fancky.authorization.model.dto.PermissionAssignDTO;
 import com.fancky.authorization.model.dto.RolePermissionDto;
 import com.fancky.authorization.model.response.MessageResult;
 import com.fancky.authorization.service.SysRolePermissionService;
@@ -20,11 +21,13 @@ public class SysRolePermissionController {
     private SysRolePermissionService rolePermissionService;
 
 
-    @PostMapping("/add-role-permission")
-    public MessageResult<Void> addRolePermission(@Valid @RequestBody RolePermissionDto dto) throws Exception {
-        rolePermissionService.addRolePermission(dto);
+
+    @PostMapping("/assign-permissions")
+    public MessageResult<Void> assignPermissions(@RequestBody PermissionAssignDTO dto) throws Exception {
+        rolePermissionService.assignPermissions(dto);
         return MessageResult.success();
     }
+
 }
 
 

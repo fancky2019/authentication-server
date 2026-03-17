@@ -15,8 +15,11 @@ public class BaseEntity implements Serializable {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    @TableLogic
-    private Integer deleted;
+    /**
+     * MyBatis-Plus 的逻辑删除注解 @TableLogic
+     */
+//    @TableLogic
+//    private Integer deleted;
     private String remark;
     @TableField(value = "create_by", fill = FieldFill.INSERT)
     private String createBy;
