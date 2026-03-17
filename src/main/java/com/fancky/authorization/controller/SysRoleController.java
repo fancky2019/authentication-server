@@ -49,8 +49,8 @@ public class SysRoleController {
     /**
      * 新增角色
      */
-    @PostMapping
-    public MessageResult<Void> add(@Valid @RequestBody RoleDTO roleDTO) {
+    @PostMapping("add-role")
+    public MessageResult<Void> addRole(@Valid @RequestBody RoleDTO roleDTO) throws Exception {
         roleService.addRole(roleDTO);
         return MessageResult.success();
     }

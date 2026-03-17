@@ -16,6 +16,7 @@ import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysRoleService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
+import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -51,6 +52,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Autowired
     private RedisUtil redisUtil;
 
+    @Autowired
+    private TransactionCallbackManager callbackManager;
 
     @Override
     public void initRole() {
@@ -183,7 +186,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean addRole(RoleDTO roleDTO) {
+    public boolean addRole(RoleDTO roleDTO) throws Exception {
         // 检查角色编码是否存在
         Long count = roleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
                 .eq(SysRole::getRoleCode, roleDTO.getRoleCode()));
@@ -207,7 +210,24 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             assignPermissions(role.getId(), roleDTO.getPermissionIds());
         }
 
-        return insert > 0;
+        boolean success = insert > 0;
+//        if (success) {
+//            callbackManager.register()
+////                .releaseLock(lock, lockSuccessfully)
+//                    .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+//                    .onCommit(() -> {
+//                        // 事务提交后，可以发送MQ消息通知其他服务
+//                        // log.info("Permission added, sending notification...");
+//                        // sendPermissionChangeNotification();
+//                    })
+//                    .onRollback(() -> {
+//                        // 事务回滚后，可以做些补偿操作
+//                        // log.warn("Permission addition rolled back");
+//                    })
+//                    .execute();
+//        }
+        return success;
+
     }
 
     @Override

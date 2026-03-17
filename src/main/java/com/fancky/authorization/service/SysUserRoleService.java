@@ -21,7 +21,7 @@ public interface SysUserRoleService extends IService<SysUserRole> {
     /**
      * 为用户分配角色
      */
-    boolean assignRolesToUser(Long userId, List<Long> roleIds);
+    boolean assignRolesToUser(Long userId, List<Long> roleIds) throws Exception;
 
     /**
      * 为角色分配用户

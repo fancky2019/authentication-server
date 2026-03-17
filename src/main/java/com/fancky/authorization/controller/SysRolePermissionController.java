@@ -21,7 +21,6 @@ public class SysRolePermissionController {
     private SysRolePermissionService rolePermissionService;
 
 
-
     @PostMapping("/assign-permissions")
     public MessageResult<Void> assignPermissions(@RequestBody PermissionAssignDTO dto) throws Exception {
         rolePermissionService.assignPermissions(dto);

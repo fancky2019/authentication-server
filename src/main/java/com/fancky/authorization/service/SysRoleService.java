@@ -33,7 +33,7 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 新增角色
      */
-    boolean addRole(RoleDTO roleDTO);
+    boolean addRole(RoleDTO roleDTO) throws Exception;
 
     /**
      * 更新角色

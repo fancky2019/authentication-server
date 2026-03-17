@@ -71,4 +71,11 @@ public class SysPermissionController {
         permissionService.updateStatus(id, status);
         return MessageResult.success();
     }
+
+    @PostMapping("/add-permission")
+    public MessageResult<Void> addPermission(@Valid @RequestBody PermissionDTO permissionDTO) throws Exception {
+        permissionService.addPermission(permissionDTO);
+        return MessageResult.success();
+    }
+
 }

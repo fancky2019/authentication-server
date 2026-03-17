@@ -40,7 +40,7 @@ public class SysUserRoleController {
      * 为用户分配角色
      */
     @PostMapping("/assign-to-user")
-    public MessageResult<String> assignRolesToUser(@RequestParam Long userId, @RequestBody List<Long> roleIds) {
+    public MessageResult<String> assignRolesToUser(@RequestParam Long userId, @RequestBody List<Long> roleIds) throws Exception {
         userRoleService.assignRolesToUser(userId, roleIds);
         return MessageResult.success("角色分配成功");
     }

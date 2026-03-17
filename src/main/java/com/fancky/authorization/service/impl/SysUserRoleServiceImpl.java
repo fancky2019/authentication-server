@@ -6,9 +6,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysUserRoleMapper;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.model.entity.SysUserRole;
+import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.service.SysUserRoleService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
+import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +44,12 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
 
     @Autowired
     private RedisUtil redisUtil;
+
+    @Autowired
+    private TransactionCallbackManager callbackManager;
+
+    @Autowired
+    private SysRolePermissionService rolePermissionService;
 
     @Override
     public List<Long> getRoleIdsByUserId(Long userId) {
@@ -124,13 +132,22 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean assignRolesToUser(Long userId, List<Long> roleIds) {
-        // 删除用户原有的角色关联
-        userRoleMapper.deleteByUserId(userId);
+    public boolean assignRolesToUser(Long userId, List<Long> roleIds) throws Exception {
 
         if (roleIds == null || roleIds.isEmpty()) {
             return true;
         }
+        // 删除用户原有的角色关联
+//        userRoleMapper.deleteByUserId(userId);
+        List<SysUserRole> userRoleList = getUserRoles(userId);
+        if (CollectionUtils.isNotEmpty(userRoleList)) {
+            List<Long> roleIdList = userRoleList.stream().map(p -> p.getRoleId()).collect(Collectors.toList());
+            this.rolePermissionService.removeByIds(roleIdList);
+        }
+
+        List<Long> userRoleIdList = userRoleList.stream().map(p -> p.getId()).collect(Collectors.toList());
+        this.removeByIds(userRoleIdList);
+
 
         // 创建新的角色关联
         List<SysUserRole> userRoles = roleIds.stream()
@@ -142,7 +159,25 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
                 })
                 .collect(Collectors.toList());
 
-        return userRoleMapper.insertBatch(userRoles) > 0;
+        boolean success = userRoleMapper.insertBatch(userRoles) > 0;
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                    .deleteCache(RedisKey.USER_ROLE_KEY, RedisKey.USER_ROLE_USER_KEY,
+                            RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
     }
 
     @Override

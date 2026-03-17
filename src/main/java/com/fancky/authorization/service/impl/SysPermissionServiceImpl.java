@@ -60,13 +60,6 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     }
 
 
-
-
-
-
-
-
-
     @Override
     public List<SysPermission> getPermissionTree() {
         List<SysPermission> permissions = permissionMapper.selectList(
@@ -175,20 +168,22 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
 //        int affectRow = permissionMapper.insert(permission);
         boolean success = this.save(permission);
-        // 3. 注册事务回调 - 方式1：链式调用
-        callbackManager.register()
-//                .releaseLock(lock, lockSuccessfully)
-                .deleteCache(RedisKey.PERMISSION_KEY)
-                .onCommit(() -> {
-                    // 事务提交后，可以发送MQ消息通知其他服务
-                    // log.info("Permission added, sending notification...");
-                    // sendPermissionChangeNotification();
-                })
-                .onRollback(() -> {
-                    // 事务回滚后，可以做些补偿操作
-                    // log.warn("Permission addition rolled back");
-                })
-                .execute();
+        if (success) {
+//            // 3. 注册事务回调 - 方式1：链式调用
+//            callbackManager.register()
+////                .releaseLock(lock, lockSuccessfully)
+//                    .deleteCache(RedisKey.PERMISSION_KEY)
+//                    .onCommit(() -> {
+//                        // 事务提交后，可以发送MQ消息通知其他服务
+//                        // log.info("Permission added, sending notification...");
+//                        // sendPermissionChangeNotification();
+//                    })
+//                    .onRollback(() -> {
+//                        // 事务回滚后，可以做些补偿操作
+//                        // log.warn("Permission addition rolled back");
+//                    })
+//                    .execute();
+        }
         return success;
     }
 
