@@ -18,7 +18,7 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 查询角色详情（包含权限）
      */
-    SysRole getById(Long id);
+    SysRole getRoleById(Long id);
 
     /**
      *

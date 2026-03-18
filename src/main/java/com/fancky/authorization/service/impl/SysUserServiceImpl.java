@@ -16,6 +16,7 @@ import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.*;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
+import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
@@ -73,6 +74,10 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     @Autowired
     private JwtService jwtService;
+
+
+    @Autowired
+    private TransactionCallbackManager callbackManager;
 
     @Override
     public void initUser() {
@@ -149,6 +154,58 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
 
     @Override
+    public List<SysUser> getUserByIds(List<Long> idList) {
+        if (CollectionUtils.isEmpty(idList)) {
+            return Collections.emptyList();
+        }
+
+        try {
+            // 1. 批量查询
+            List<SysUser> roles = redisCacheService
+                    .<SysUser, Long>batchBuilder()
+                    .cache(RedisKey.USER_KEY, idList)
+                    .db(
+                            missIds -> {
+                                // 分批查询数据库
+                                LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
+                                wrapper.in(SysUser::getId, missIds);
+                                return this.list(wrapper);
+                            },
+                            SysUser::getId,
+                            SysUser.class  // 添加resultType
+                    )
+                    .nullCache(RedisKey.USER_NULL_PREFIX)  // 建议添加空值缓存
+//                    .nullCacheTimeout(30, TimeUnit.SECONDS)
+//                    .withDbBatchSize(100)  // 数据库分批大小
+//                    .enableMetrics(true)    // 启用性能监控
+                    .execute();
+
+            // 2. 检查结果（只检查传入的ID是否都有返回）
+            Set<Long> foundIds = roles.stream()
+                    .filter(Objects::nonNull)
+                    .map(SysUser::getId)
+                    .collect(Collectors.toSet());
+
+            List<Long> notFoundIds = idList.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!notFoundIds.isEmpty()) {
+                log.warn("Some SysUser ids not found: {}", StringUtils.join(notFoundIds, ","));
+                // 根据业务需求决定是否抛异常
+                // throw new Exception("Can't get role info for ids: " + notFoundIds);
+            }
+
+            return roles;
+
+        } catch (Exception e) {
+            log.error("Failed to get SysUser by ids: {}", StringUtils.join(idList, ","), e);
+            throw new RuntimeException("Failed to get SysUser by ids", e);
+        }
+    }
+
+
+    @Override
     public PageVO<SysUser> getUserPage(UserDTO userDTO) {
         Page<SysUser> page = new Page<>(userDTO.getCurrent(), userDTO.getSize());
 
@@ -187,19 +244,20 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         user.setAccountNonLocked(true);
         user.setCredentialsNonExpired(true);
 
-        int insert = sysUserMapper.insert(user);
+//        int insert = sysUserMapper.insert(user);
 
-        // 分配角色
-        if (userDTO.getRoleIds() != null && userDTO.getRoleIds().length > 0) {
-            assignRoles(user.getId(), userDTO.getRoleIds());
-        }
+        return this.save(user);
+//        // 分配角色
+//        if (userDTO.getRoleIds() != null && userDTO.getRoleIds().length > 0) {
+//            assignRoles(user.getId(), userDTO.getRoleIds());
+//        }
 
-        return insert > 0;
+//        return insert > 0;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updateUser(UserDTO userDTO) {
+    public boolean updateUser(UserDTO userDTO) throws Exception {
         SysUser user = sysUserMapper.selectById(userDTO.getId());
         if (user == null) {
             throw new RuntimeException("用户不存在");
@@ -229,7 +287,31 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             }
         }
 
-        return update > 0;
+        this.redisTemplate.opsForHash().delete(RedisKey.USER_CODE_KEY, user.getUsername());
+        this.redisTemplate.opsForHash().delete(RedisKey.USER_KEY, user.getId().toString());
+        boolean success = update > 0;
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+//                    .deleteCache(RedisKey.USER_ROLE_KEY, RedisKey.USER_ROLE_USER_KEY,
+//                            RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        this.redisTemplate.opsForHash().delete(RedisKey.USER_CODE_KEY, user.getUsername());
+                        this.redisTemplate.opsForHash().delete(RedisKey.USER_KEY, user.getId().toString());
+
+
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
     }
 
     @Override

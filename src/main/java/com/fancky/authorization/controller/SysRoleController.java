@@ -42,8 +42,8 @@ public class SysRoleController {
      * http Get 会自动命中此方法
      */
     @GetMapping("/{id}")
-    public MessageResult<SysRole> getById(@PathVariable Long id) {
-        SysRole role = roleService.getById(id);
+    public MessageResult<SysRole> getRoleById(@PathVariable Long id) {
+        SysRole role = roleService.getRoleById(id);
         return MessageResult.success(role);
     }
 

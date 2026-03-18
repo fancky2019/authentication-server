@@ -32,7 +32,7 @@ public interface SysUserService extends IService<SysUser> {
     Map<String, String> refreshToken(RefreshTokenRequest request) throws Exception;
 
     SysUser getUserById(Long id) throws Exception;
-
+    List<SysUser> getUserByIds(List<Long> idList);
     /**
      * 分页查询用户列表
      */
@@ -46,7 +46,7 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 更新用户
      */
-    boolean updateUser(UserDTO userDTO);
+    boolean updateUser(UserDTO userDTO) throws Exception;
 
     /**
      * 删除用户

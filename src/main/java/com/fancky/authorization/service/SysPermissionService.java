@@ -20,7 +20,7 @@ public interface SysPermissionService extends IService<SysPermission> {
      */
     List<SysPermission> getUserPermissions(Long userId);
 
-    SysPermission getById(Long id);
+    SysPermission getPermissionById(Long id);
 
     /**
      * 获取用户权限

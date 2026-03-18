@@ -76,7 +76,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     }
 
     @Override
-    public SysPermission getById(Long id) {
+    public SysPermission getPermissionById(Long id) {
         List<SysPermission> roleList = getPermissionByIds(Arrays.asList(id));
         if (CollectionUtils.isEmpty(roleList)) {
             return null;

@@ -205,15 +205,15 @@ public class UserController {
      * 查询用户详情
      */
     @GetMapping("/{id}")
-    public MessageResult<SysUser> getById(@PathVariable Long id) {
-        SysUser user = userService.getById(id);
+    public MessageResult<SysUser> getUserById(@PathVariable Long id) throws Exception {
+        SysUser user = userService.getUserById(id);
         return MessageResult.success(user);
     }
 
     /**
      * 新增用户
      */
-    @PostMapping
+    @PostMapping("/add")
     public MessageResult<Void> add(@Valid @RequestBody UserDTO userDTO) {
         userService.addUser(userDTO);
         return MessageResult.success();
@@ -223,7 +223,7 @@ public class UserController {
      * 修改用户
      */
     @PutMapping
-    public MessageResult<Void> update(@Valid @RequestBody UserDTO userDTO) {
+    public MessageResult<Void> update(@Valid @RequestBody UserDTO userDTO) throws Exception {
         userService.updateUser(userDTO);
         return MessageResult.success();
     }

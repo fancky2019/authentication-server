@@ -31,8 +31,8 @@ public class SysPermissionController {
      * 查询权限详情
      */
     @GetMapping("/{id}")
-    public MessageResult<SysPermission> getById(@PathVariable Long id) {
-        SysPermission permission = permissionService.getById(id);
+    public MessageResult<SysPermission> getPermissionById(@PathVariable Long id) {
+        SysPermission permission = permissionService.getPermissionById(id);
         return MessageResult.success(permission);
     }
 
