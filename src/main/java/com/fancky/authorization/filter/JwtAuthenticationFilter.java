@@ -172,13 +172,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     String requestURI = request.getRequestURI();
                     // /api/auth/getCurrentUser
                     String servletPath = request.getServletPath();
-                    List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+                    List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getByRoleIds(roleIdList);
                     if (CollectionUtils.isEmpty(sysRolePermissionList)) {
                         sendForbiddenResponse(response, "用户没有角色权限信息");
                         return;
                     }
                     List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
-                    List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
+                    List<SysPermission> permissionList = sysPermissionService.getPermissionByIds(sysPermissionIdList);
                     if (CollectionUtils.isEmpty(permissionList)) {
                         sendForbiddenResponse(response, "用户没有权限信息");
                         return;

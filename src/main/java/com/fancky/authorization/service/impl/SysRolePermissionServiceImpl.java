@@ -3,28 +3,22 @@ package com.fancky.authorization.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.fancky.authorization.mapper.SysPermissionMapper;
 import com.fancky.authorization.mapper.SysRolePermissionMapper;
 import com.fancky.authorization.model.dto.PermissionAssignDTO;
-import com.fancky.authorization.model.dto.RolePermissionDto;
 import com.fancky.authorization.model.entity.SysPermission;
-import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
-import com.fancky.authorization.model.entity.SysUser;
 import com.fancky.authorization.service.SysPermissionService;
 import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
 import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +26,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+
+import static org.bouncycastle.asn1.cmc.CMCStatus.success;
 
 @Slf4j
 @Service
@@ -64,7 +60,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
     }
 
     @Override
-    public List<SysRolePermission> getPermissionsByRoleIds(List<Long> roleIdList) {
+    public List<SysRolePermission> getByRoleIds(List<Long> roleIdList) {
         if (CollectionUtils.isEmpty(roleIdList)) {
             return Collections.emptyList();
         }
@@ -128,6 +124,59 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
             initRolePermission();
         }
         return new ArrayList<>(rolePermissionMap.values());
+    }
+
+    @Override
+    public List<SysRolePermission> getByPermissionIds(List<Long> permissionIdList) {
+        if (CollectionUtils.isEmpty(permissionIdList)) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.in(SysRolePermission::getPermissionId, permissionIdList);
+        return this.list(lambdaQueryWrapper);
+    }
+
+    @Override
+    public boolean removeByPermissionIds(List<Long> permissionIdList) throws Exception {
+        if (CollectionUtils.isEmpty(permissionIdList)) {
+            return false;
+        }
+        List<SysRolePermission> sysRolePermissionList = getByPermissionIds(permissionIdList);
+        List<Long> sysRolePermissionIdList = sysRolePermissionList.stream().map(p -> p.getId()).collect(Collectors.toList());
+        return deleteBatch(sysRolePermissionIdList);
+    }
+
+    @Override
+    public boolean deleteBatch(List<Long> sysRolePermissionIdList) throws Exception {
+        if (CollectionUtils.isEmpty(sysRolePermissionIdList)) {
+            return false;
+        }
+
+
+        removeCache(sysRolePermissionIdList, null);
+        boolean success = this.removeByIds(sysRolePermissionIdList);
+
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                    //此处优化成 删除 角色key
+                    .deleteCache(RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        removeCache(sysRolePermissionIdList, null);
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
+
+
     }
 
     @Override
@@ -256,7 +305,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
 //        Map<String, SysRolePermission> rolePermissionMap = this.redisUtil.getHash(RedisKey.ROLE_PERMISSION_KEY, SysRolePermission.class);
 //        List<SysRolePermission> rolePermissionList =
 //                rolePermissionMap.values().stream().filter(p -> p.getRoleId().equals(roleId)).collect(Collectors.toList());
-        List<SysRolePermission> rolePermissionList = this.getPermissionsByRoleIds(Arrays.asList(roleId));
+        List<SysRolePermission> rolePermissionList = this.getByRoleIds(Arrays.asList(roleId));
 //        List<SysRolePermission> rolePermissionList = (List<SysRolePermission>) this.redisTemplate.opsForHash().get(RedisKey.ROLE_PERMISSION_ROLE_KEY, roleId.toString());
         List<Long> existingPermissionIds = rolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
         Set<Long> existingSet = new HashSet<>(existingPermissionIds);
@@ -410,33 +459,35 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
 //        return remove(new LambdaQueryWrapper<SysRolePermission>()
 //                .eq(SysRolePermission::getRoleId, roleId));
 
-        List<SysRolePermission> sysRolePermissionList = this.getPermissionsByRoleIds(Arrays.asList(roleId));
+        List<SysRolePermission> sysRolePermissionList = this.getByRoleIds(Arrays.asList(roleId));
         List<Long> sysRolePermissionIdList = sysRolePermissionList.stream().map(p -> p.getId()).collect(Collectors.toList());
-        if (CollectionUtils.isNotEmpty(sysRolePermissionIdList)) {
-            removeCache(sysRolePermissionIdList, roleId);
-            boolean success = this.removeByIds(sysRolePermissionIdList);
+        return deleteBatch(sysRolePermissionIdList);
 
-            if (success) {
-                // 3. 注册事务回调 - 方式1：链式调用
-                callbackManager.register()
-//                .releaseLock(lock, lockSuccessfully)
-                        //此处优化成 删除 角色key
-//                        .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
-                        .onCommit(() -> {
-                            // 事务提交后，可以发送MQ消息通知其他服务
-                            // log.info("Permission added, sending notification...");
-                            // sendPermissionChangeNotification();
-                            removeCache(sysRolePermissionIdList, roleId);
-                        })
-                        .onRollback(() -> {
-                            // 事务回滚后，可以做些补偿操作
-                            // log.warn("Permission addition rolled back");
-                        })
-                        .execute();
-            }
-            return success;
-        }
-        return true;
+//        if (CollectionUtils.isNotEmpty(sysRolePermissionIdList)) {
+//            removeCache(sysRolePermissionIdList, roleId);
+//            boolean success = this.removeByIds(sysRolePermissionIdList);
+//
+//            if (success) {
+//                // 3. 注册事务回调 - 方式1：链式调用
+//                callbackManager.register()
+////                .releaseLock(lock, lockSuccessfully)
+//                        //此处优化成 删除 角色key
+////                        .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+//                        .onCommit(() -> {
+//                            // 事务提交后，可以发送MQ消息通知其他服务
+//                            // log.info("Permission added, sending notification...");
+//                            // sendPermissionChangeNotification();
+//                            removeCache(sysRolePermissionIdList, roleId);
+//                        })
+//                        .onRollback(() -> {
+//                            // 事务回滚后，可以做些补偿操作
+//                            // log.warn("Permission addition rolled back");
+//                        })
+//                        .execute();
+//            }
+//            return success;
+//        }
+//        return true;
 
     }
 
@@ -445,7 +496,10 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
         String[] idStrArray = sysRolePermissionIdList.stream()
                 .map(p -> p.toString())
                 .toArray(String[]::new);
-        this.redisTemplate.opsForHash().delete(RedisKey.ROLE_PERMISSION_ROLE_KEY, roleId.toString());
+        if (roleId != null && roleId > 0) {
+            this.redisTemplate.opsForHash().delete(RedisKey.ROLE_PERMISSION_ROLE_KEY, roleId.toString());
+        }
+
         this.redisTemplate.opsForHash().delete(RedisKey.ROLE_PERMISSION_KEY, idStrArray);
 
     }

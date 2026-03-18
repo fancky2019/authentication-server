@@ -321,14 +321,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         List<String> roleCodeList = roleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
         sysUser.setRoles(roleCodeList);
 
-        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getByRoleIds(roleIdList);
         if (CollectionUtils.isEmpty(sysRolePermissionList)) {
             String roleIdListStr = StringUtils.join(roleIdList, ",");
             log.info("Role {} don't set permission information", roleIdListStr);
             return sysUser;
         }
         List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
-        List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
+        List<SysPermission> permissionList = sysPermissionService.getPermissionByIds(sysPermissionIdList);
         if (CollectionUtils.isEmpty(permissionList)) {
             String sysPermissionIdListStr = StringUtils.join(sysPermissionIdList, ",");
             log.info("Can not get permission information by id {}", sysPermissionIdListStr);
@@ -513,14 +513,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         List<String> roleCodeList = roleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
         sysUser.setRoles(roleCodeList);
 
-        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(roleIdList);
+        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getByRoleIds(roleIdList);
         if (CollectionUtils.isEmpty(sysRolePermissionList)) {
             String roleIdListStr = StringUtils.join(roleIdList, ",");
             log.info("Role {} don't set permission information", roleIdListStr);
             return Collections.emptyList();
         }
         List<Long> sysPermissionIdList = sysRolePermissionList.stream().map(p -> p.getPermissionId()).distinct().collect(Collectors.toList());
-        List<SysPermission> permissionList = sysPermissionService.getPermissions(sysPermissionIdList);
+        List<SysPermission> permissionList = sysPermissionService.getPermissionByIds(sysPermissionIdList);
         if (CollectionUtils.isEmpty(permissionList)) {
             String sysPermissionIdListStr = StringUtils.join(sysPermissionIdList, ",");
             log.info("Can not get permission information by id {}", sysPermissionIdListStr);

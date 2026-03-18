@@ -6,13 +6,12 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysPermissionMapper;
 import com.fancky.authorization.model.dto.PermissionDTO;
 import com.fancky.authorization.model.entity.SysPermission;
-import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.service.SysPermissionService;
+import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
 import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -33,7 +32,8 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     @Autowired
     private SysPermissionMapper permissionMapper;
 
-
+    @Autowired
+    private SysRolePermissionService sysRolePermissionService;
     @Autowired
     private RedisCacheService redisCacheService;
     @Autowired
@@ -76,7 +76,16 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
     }
 
     @Override
-    public List<SysPermission> getPermissions(List<Long> idList) {
+    public SysPermission getById(Long id) {
+        List<SysPermission> roleList = getPermissionByIds(Arrays.asList(id));
+        if (CollectionUtils.isEmpty(roleList)) {
+            return null;
+        }
+        return roleList.get(0);
+    }
+
+    @Override
+    public List<SysPermission> getPermissionByIds(List<Long> idList) {
         if (CollectionUtils.isEmpty(idList)) {
             return Collections.emptyList();
         }
@@ -189,7 +198,7 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updatePermission(PermissionDTO permissionDTO) {
+    public boolean updatePermission(PermissionDTO permissionDTO) throws Exception {
         SysPermission permission = permissionMapper.selectById(permissionDTO.getId());
         if (permission == null) {
             throw new RuntimeException("权限不存在");
@@ -222,26 +231,76 @@ public class SysPermissionServiceImpl extends ServiceImpl<SysPermissionMapper, S
         permission.setVisible(permissionDTO.getVisible());
         permission.setStatus(permissionDTO.getStatus());
         permission.setRemark(permissionDTO.getRemark());
+        this.redisTemplate.opsForHash().delete(RedisKey.PERMISSION_KEY, permissionDTO.getId().toString());
+        boolean success =  permissionMapper.updateById(permission) > 0;
 
-        return permissionMapper.updateById(permission) > 0;
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+//                    .deleteCache(RedisKey.USER_ROLE_KEY, RedisKey.USER_ROLE_USER_KEY,
+//                            RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        this.redisTemplate.opsForHash().delete(RedisKey.PERMISSION_KEY, permissionDTO.getId().toString());
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deletePermission(Long id) {
+    public boolean deletePermission(Long id) throws Exception {
         // 检查是否有子节点
         if (hasChildren(id)) {
             throw new RuntimeException("存在子权限，无法删除");
         }
 
-        // 检查是否被角色使用
-        Long count = permissionMapper.countRolePermission(id);
-        if (count > 0) {
-            throw new RuntimeException("该权限已被角色使用，无法删除");
-        }
+//        // 检查是否被角色使用
+//        Long count = permissionMapper.countRolePermission(id);
+//        if (count > 0) {
+//            throw new RuntimeException("该权限已被角色使用，无法删除");
+//        }
 
-        return permissionMapper.deleteById(id) > 0;
+      boolean removeRolePermissionSuccess=  this.sysRolePermissionService.removeByPermissionIds(Arrays.asList(id));
+        if(!removeRolePermissionSuccess)
+        {
+            log.info("removeByPermissionIds fail");
+            return false;
+
+        }
+        this.redisTemplate.opsForHash().delete(RedisKey.PERMISSION_KEY,id.toString());
+        boolean success=  this.removeById(id);
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                    //此处优化成 删除 角色key
+//                        .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+
+                        this.redisTemplate.opsForHash().delete(RedisKey.PERMISSION_KEY,id.toString());
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
     }
+
+
+
 
     @Override
     public boolean updateStatus(Long id, Integer status) {

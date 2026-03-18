@@ -36,13 +36,11 @@ public class SysPermissionController {
         return MessageResult.success(permission);
     }
 
-
-
     /**
      * 修改权限
      */
-    @PutMapping
-    public MessageResult<Void> update(@Valid @RequestBody PermissionDTO permissionDTO) {
+    @PutMapping("/update")
+    public MessageResult<Void> update(@Valid @RequestBody PermissionDTO permissionDTO) throws Exception {
         permissionService.updatePermission(permissionDTO);
         return MessageResult.success();
     }
@@ -50,8 +48,8 @@ public class SysPermissionController {
     /**
      * 删除权限
      */
-    @DeleteMapping("/{id}")
-    public MessageResult<Void> delete(@PathVariable Long id) {
+    @DeleteMapping("/delete/{id}")
+    public MessageResult<Void> delete(@PathVariable Long id) throws Exception {
         permissionService.deletePermission(id);
         return MessageResult.success();
     }
@@ -65,8 +63,8 @@ public class SysPermissionController {
         return MessageResult.success();
     }
 
-    @PostMapping("/add-permission")
-    public MessageResult<Void> addPermission(@Valid @RequestBody PermissionDTO permissionDTO) throws Exception {
+    @PostMapping("/add")
+    public MessageResult<Void> add(@Valid @RequestBody PermissionDTO permissionDTO) throws Exception {
         permissionService.addPermission(permissionDTO);
         return MessageResult.success();
     }

@@ -88,7 +88,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Override
     public SysRole getById(Long id) {
         List<SysRole> roleList = getRoleByIds(Arrays.asList(id));
-        if (CollectionUtils.isNotEmpty(roleList)) {
+        if (CollectionUtils.isEmpty(roleList)) {
             return null;
         }
         return roleList.get(0);

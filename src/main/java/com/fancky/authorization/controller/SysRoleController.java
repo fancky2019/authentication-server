@@ -40,7 +40,7 @@ public class SysRoleController {
     /**
      * 查询角色详情
      */
-    @GetMapping("/get-by-id/{id}")
+    @GetMapping("/{id}")
     public MessageResult<SysRole> getById(@PathVariable Long id) {
         SysRole role = roleService.getById(id);
         return MessageResult.success(role);
@@ -49,7 +49,7 @@ public class SysRoleController {
     /**
      * 查询角色详情
      */
-    @GetMapping("/get-by-ids/")
+    @GetMapping("/ids")
     public MessageResult<List<SysRole>> getRoleByIds(List<Long> idList) throws Exception {
         List<SysRole> roleList = roleService.getRoleByIds(idList);
         return MessageResult.success(roleList);

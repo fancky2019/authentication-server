@@ -20,10 +20,12 @@ public interface SysPermissionService extends IService<SysPermission> {
      */
     List<SysPermission> getUserPermissions(Long userId);
 
+    SysPermission getById(Long id);
+
     /**
      * 获取用户权限
      */
-    List<SysPermission> getPermissions(List<Long> idList);
+    List<SysPermission> getPermissionByIds(List<Long> idList);
 
     /**
      * 新增权限
@@ -33,12 +35,12 @@ public interface SysPermissionService extends IService<SysPermission> {
     /**
      * 更新权限
      */
-    boolean updatePermission(PermissionDTO permissionDTO);
+    boolean updatePermission(PermissionDTO permissionDTO) throws Exception;
 
     /**
      * 删除权限
      */
-    boolean deletePermission(Long id);
+    boolean deletePermission(Long id) throws Exception;
 
     /**
      * 更新状态
