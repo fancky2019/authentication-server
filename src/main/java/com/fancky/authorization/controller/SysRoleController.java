@@ -39,6 +39,7 @@ public class SysRoleController {
 
     /**
      * 查询角色详情
+     * http Get 会自动命中此方法
      */
     @GetMapping("/{id}")
     public MessageResult<SysRole> getById(@PathVariable Long id) {
@@ -76,8 +77,9 @@ public class SysRoleController {
 
     /**
      * 删除角色
+     * http Delete 会自动命中此方法
      */
-    @DeleteMapping("/delete/{id}")
+    @DeleteMapping("/{id}")
     public MessageResult<Void> delete(@PathVariable Long id) throws Exception {
         roleService.deleteRole(id);
         return MessageResult.success();
@@ -86,7 +88,7 @@ public class SysRoleController {
     /**
      * 批量删除角色
      */
-    @DeleteMapping("/delete/batch")
+    @DeleteMapping("/delete-batch")
     public MessageResult<Void> deleteBatch(@RequestBody Long[] ids) throws Exception {
         roleService.deleteBatch(ids);
         return MessageResult.success();
