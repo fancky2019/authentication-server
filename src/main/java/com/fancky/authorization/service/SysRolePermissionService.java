@@ -46,7 +46,7 @@ public interface SysRolePermissionService extends IService<SysRolePermission> {
     /**
      * 移除角色的所有权限
      */
-    boolean removeRolePermissions(Long roleId) throws Exception;
+    boolean removeByRole(Long roleId) throws Exception;
 
     /**
      * 移除权限的所有角色

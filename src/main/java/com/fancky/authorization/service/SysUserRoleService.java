@@ -18,6 +18,7 @@ public interface SysUserRoleService extends IService<SysUserRole> {
      */
     List<Long> getUserIdsByRoleId(Long roleId);
 
+    List<SysUserRole> getByRoleId(Long roleId);
     /**
      * 为用户分配角色
      */
@@ -41,7 +42,9 @@ public interface SysUserRoleService extends IService<SysUserRole> {
     /**
      * 移除角色的所有用户
      */
-    boolean removeRoleUsers(Long roleId);
+    boolean removeByRole(Long roleId) throws Exception;
+
+    boolean deleteBatch(List<Long> idList) throws Exception;
 
     /**
      * 检查用户是否拥有某个角色

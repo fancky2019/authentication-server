@@ -62,6 +62,16 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
     }
 
     @Override
+    public List<SysUserRole> getByRoleId(Long roleId) {
+        if (roleId == null || roleId <= 0) {
+            return null;
+        }
+        LambdaQueryWrapper<SysUserRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(SysUserRole::getRoleId, roleId);
+        return this.list(lambdaQueryWrapper);
+    }
+
+    @Override
     public void initUserRole() {
 //        log.info("start init UserRole");
 //        redisTemplate.delete(RedisKey.USER_ROLE_KEY);
@@ -145,7 +155,6 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
         }
 
 
-
         // 创建新的角色关联
         List<SysUserRole> userRoles = roleIds.stream()
                 .map(roleId -> {
@@ -217,10 +226,53 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean removeRoleUsers(Long roleId) {
-        return remove(new LambdaQueryWrapper<SysUserRole>()
-                .eq(SysUserRole::getRoleId, roleId));
+    public boolean removeByRole(Long roleId) throws Exception {
+        List<SysUserRole> sysUserRoleList = this.getByRoleId(roleId);
+        List<Long> idList = sysUserRoleList.stream().map(p -> p.getId()).collect(Collectors.toList());
+        return deleteBatch(idList);
     }
+
+    @Override
+    public boolean deleteBatch(List<Long> userRoleIdList) throws Exception {
+        if (CollectionUtils.isEmpty(userRoleIdList)) {
+            return false;
+        }
+
+
+        removeCache(userRoleIdList, null);
+        boolean success = this.removeByIds(userRoleIdList);
+
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                    //此处优化成 删除 角色key
+                    .deleteCache(RedisKey.USER_ROLE_USER_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        removeCache(userRoleIdList, null);
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
+    }
+
+    private void removeCache(List<Long> userRoleIdList, Long userId) {
+        String[] idStrArray = userRoleIdList.stream()
+                .map(p -> p.toString())
+                .toArray(String[]::new);
+        if (userId != null && userId > 0) {
+            this.redisTemplate.opsForHash().delete(RedisKey.USER_ROLE_USER_KEY, userId.toString());
+        }
+        this.redisTemplate.opsForHash().delete(RedisKey.USER_ROLE_KEY, idStrArray);
+    }
+
 
     @Override
     public boolean hasRole(Long userId, Long roleId) {

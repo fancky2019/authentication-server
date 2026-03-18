@@ -455,7 +455,7 @@ public class SysRolePermissionServiceImpl extends ServiceImpl<SysRolePermissionM
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean removeRolePermissions(Long roleId) throws Exception {
+    public boolean removeByRole(Long roleId) throws Exception {
 //        return remove(new LambdaQueryWrapper<SysRolePermission>()
 //                .eq(SysRolePermission::getRoleId, roleId));
 

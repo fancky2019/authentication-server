@@ -8,18 +8,16 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fancky.authorization.mapper.SysRoleMapper;
 import com.fancky.authorization.mapper.SysRolePermissionMapper;
 import com.fancky.authorization.model.dto.RoleDTO;
-import com.fancky.authorization.model.entity.SysPermission;
 import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
-import com.fancky.authorization.model.entity.SysUserRole;
 import com.fancky.authorization.model.response.PageVO;
 import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.service.SysRoleService;
+import com.fancky.authorization.service.SysUserRoleService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
 import com.fancky.authorization.utility.TransactionCallbackManager;
 import com.fancky.authorization.utility.cache.RedisCacheService;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.collections4.CollectionUtils;
 import org.redisson.api.RedissonClient;
@@ -31,7 +29,6 @@ import org.apache.commons.lang3.StringUtils;
 
 
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,6 +56,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Autowired
     private SysRolePermissionService sysRolePermissionService;
 
+    @Autowired
+    private SysUserRoleService sysUserRoleService;
 
     @Override
     public void initRole() {
@@ -310,7 +309,8 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 //        if (CollectionUtils.isNotEmpty(sysRolePermissionIdList)) {
 //            this.sysRolePermissionService.removeByIds(sysRolePermissionIdList);
 //        }
-        this.sysRolePermissionService.removeRolePermissions(id);
+        this.sysUserRoleService.removeByRole(id);
+        this.sysRolePermissionService.removeByRole(id);
 
         this.redisTemplate.opsForHash().delete(RedisKey.ROLE_KEY, id.toString());
 
