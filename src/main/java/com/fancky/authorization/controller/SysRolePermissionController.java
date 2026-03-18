@@ -21,6 +21,12 @@ public class SysRolePermissionController {
     private SysRolePermissionService rolePermissionService;
 
 
+    /**
+     * 分配角色权限
+     * @param dto
+     * @return
+     * @throws Exception
+     */
     @PostMapping("/assign-permissions")
     public MessageResult<Void> assignPermissions(@RequestBody PermissionAssignDTO dto) throws Exception {
         rolePermissionService.assignPermissions(dto);

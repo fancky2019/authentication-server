@@ -13,6 +13,7 @@ import com.fancky.authorization.model.entity.SysRole;
 import com.fancky.authorization.model.entity.SysRolePermission;
 import com.fancky.authorization.model.entity.SysUserRole;
 import com.fancky.authorization.model.response.PageVO;
+import com.fancky.authorization.service.SysRolePermissionService;
 import com.fancky.authorization.service.SysRoleService;
 import com.fancky.authorization.utility.RedisKey;
 import com.fancky.authorization.utility.RedisUtil;
@@ -55,6 +56,10 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     @Autowired
     private TransactionCallbackManager callbackManager;
 
+    @Autowired
+    private SysRolePermissionService sysRolePermissionService;
+
+
     @Override
     public void initRole() {
         log.info("start init Role");
@@ -81,16 +86,12 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
     }
 
     @Override
-    public SysRole getRoleWithPermissions(Long id) {
-        SysRole role = roleMapper.selectById(id);
-        if (role != null) {
-            List<SysPermission> permissions = roleMapper.selectPermissionsByRoleId(id);
-            role.setPermissions(permissions);
-            role.setPermissionIds(permissions.stream()
-                    .map(SysPermission::getId)
-                    .collect(Collectors.toList()));
+    public SysRole getById(Long id) {
+        List<SysRole> roleList = getRoleByIds(Arrays.asList(id));
+        if (CollectionUtils.isNotEmpty(roleList)) {
+            return null;
         }
-        return role;
+        return roleList.get(0);
     }
 
     @Override
@@ -232,7 +233,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean updateRole(RoleDTO roleDTO) {
+    public boolean updateRole(RoleDTO roleDTO) throws Exception {
         SysRole role = roleMapper.selectById(roleDTO.getId());
         if (role == null) {
             throw new RuntimeException("角色不存在");
@@ -246,7 +247,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                 throw new RuntimeException("角色编码已存在");
             }
         }
-
+        this.redisTemplate.opsForHash().delete(RedisKey.ROLE_KEY, roleDTO.getId().toString());
         // 更新角色信息
         role.setRoleCode(roleDTO.getRoleCode());
         role.setRoleName(roleDTO.getRoleName());
@@ -257,35 +258,87 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
 
         int update = roleMapper.updateById(role);
 
-        // 更新权限
-        if (roleDTO.getPermissionIds() != null) {
-            // 删除原有权限
-            rolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
-                    .eq(SysRolePermission::getRoleId, role.getId()));
+//        // 更新权限
+//        if (roleDTO.getPermissionIds() != null) {
+//            // 删除原有权限
+//            rolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
+//                    .eq(SysRolePermission::getRoleId, role.getId()));
+//
+//            // 分配新权限
+//            if (roleDTO.getPermissionIds().length > 0) {
+//                assignPermissions(role.getId(), roleDTO.getPermissionIds());
+//            }
+//        }
 
-            // 分配新权限
-            if (roleDTO.getPermissionIds().length > 0) {
-                assignPermissions(role.getId(), roleDTO.getPermissionIds());
-            }
+        boolean success = update > 0;
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+//                    .deleteCache(RedisKey.USER_ROLE_KEY, RedisKey.USER_ROLE_USER_KEY,
+//                            RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        this.redisTemplate.opsForHash().delete(RedisKey.ROLE_KEY, roleDTO.getId().toString());
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
         }
-
-        return update > 0;
+        return success;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deleteRole(Long id) {
-        // 删除角色权限关联
-        rolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
-                .eq(SysRolePermission::getRoleId, id));
+    public boolean deleteRole(Long id) throws Exception {
+        if (id == null || id <= 0) {
+            return false;
+        }
+//        // 删除角色权限关联
+//        rolePermissionMapper.delete(new LambdaQueryWrapper<SysRolePermission>()
+//                .eq(SysRolePermission::getRoleId, id));
+//
+//        // 删除角色
+//        return roleMapper.deleteById(id) > 0;
 
-        // 删除角色
-        return roleMapper.deleteById(id) > 0;
+//        List<SysRolePermission> sysRolePermissionList = this.sysRolePermissionService.getPermissionsByRoleIds(Arrays.asList(id));
+//        List<Long> sysRolePermissionIdList = sysRolePermissionList.stream().map(p -> p.getId()).collect(Collectors.toList());
+//        if (CollectionUtils.isNotEmpty(sysRolePermissionIdList)) {
+//            this.sysRolePermissionService.removeByIds(sysRolePermissionIdList);
+//        }
+        this.sysRolePermissionService.removeRolePermissions(id);
+
+        this.redisTemplate.opsForHash().delete(RedisKey.ROLE_KEY, id.toString());
+
+        boolean success = this.removeById(id);
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                    //此处优化成 删除 角色key
+//                    .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        this.redisTemplate.opsForHash().delete(RedisKey.ROLE_KEY, id.toString());
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deleteBatch(Long[] ids) {
+    public boolean deleteBatch(Long[] ids) throws Exception {
         for (Long id : ids) {
             deleteRole(id);
         }

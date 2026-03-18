@@ -36,14 +36,7 @@ public class SysPermissionController {
         return MessageResult.success(permission);
     }
 
-    /**
-     * 新增权限
-     */
-    @PostMapping("/add-permission")
-    public MessageResult<Void> add(@Valid @RequestBody PermissionDTO permissionDTO) throws Exception {
-        permissionService.addPermission(permissionDTO);
-        return MessageResult.success();
-    }
+
 
     /**
      * 修改权限

@@ -40,16 +40,26 @@ public class SysRoleController {
     /**
      * 查询角色详情
      */
-    @GetMapping("/{id}")
+    @GetMapping("/get-by-id/{id}")
     public MessageResult<SysRole> getById(@PathVariable Long id) {
-        SysRole role = roleService.getRoleWithPermissions(id);
+        SysRole role = roleService.getById(id);
         return MessageResult.success(role);
     }
 
     /**
+     * 查询角色详情
+     */
+    @GetMapping("/get-by-ids/")
+    public MessageResult<List<SysRole>> getRoleByIds(List<Long> idList) throws Exception {
+        List<SysRole> roleList = roleService.getRoleByIds(idList);
+        return MessageResult.success(roleList);
+    }
+
+
+    /**
      * 新增角色
      */
-    @PostMapping("add-role")
+    @PostMapping("/add")
     public MessageResult<Void> addRole(@Valid @RequestBody RoleDTO roleDTO) throws Exception {
         roleService.addRole(roleDTO);
         return MessageResult.success();
@@ -58,8 +68,8 @@ public class SysRoleController {
     /**
      * 修改角色
      */
-    @PutMapping
-    public MessageResult<Void> update(@Valid @RequestBody RoleDTO roleDTO) {
+    @PutMapping("/update")
+    public MessageResult<Void> update(@Valid @RequestBody RoleDTO roleDTO) throws Exception {
         roleService.updateRole(roleDTO);
         return MessageResult.success();
     }
@@ -67,8 +77,8 @@ public class SysRoleController {
     /**
      * 删除角色
      */
-    @DeleteMapping("/{id}")
-    public MessageResult<Void> delete(@PathVariable Long id) {
+    @DeleteMapping("/delete/{id}")
+    public MessageResult<Void> delete(@PathVariable Long id) throws Exception {
         roleService.deleteRole(id);
         return MessageResult.success();
     }
@@ -76,8 +86,8 @@ public class SysRoleController {
     /**
      * 批量删除角色
      */
-    @DeleteMapping("/batch")
-    public MessageResult<Void> deleteBatch(@RequestBody Long[] ids) {
+    @DeleteMapping("/delete/batch")
+    public MessageResult<Void> deleteBatch(@RequestBody Long[] ids) throws Exception {
         roleService.deleteBatch(ids);
         return MessageResult.success();
     }

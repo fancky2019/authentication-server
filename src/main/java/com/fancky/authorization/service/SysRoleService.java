@@ -18,7 +18,7 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 查询角色详情（包含权限）
      */
-    SysRole getRoleWithPermissions(Long id);
+    SysRole getById(Long id);
 
     /**
      *
@@ -38,17 +38,17 @@ public interface SysRoleService extends IService<SysRole> {
     /**
      * 更新角色
      */
-    boolean updateRole(RoleDTO roleDTO);
+    boolean updateRole(RoleDTO roleDTO) throws Exception;
 
     /**
      * 删除角色
      */
-    boolean deleteRole(Long id);
+    boolean deleteRole(Long id) throws Exception;
 
     /**
      * 批量删除角色
      */
-    boolean deleteBatch(Long[] ids);
+    boolean deleteBatch(Long[] ids) throws Exception;
 
     /**
      * 更新角色状态

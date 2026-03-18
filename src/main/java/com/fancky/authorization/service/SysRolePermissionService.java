@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.fancky.authorization.model.dto.PermissionAssignDTO;
 import com.fancky.authorization.model.dto.RolePermissionDto;
 import com.fancky.authorization.model.entity.SysRolePermission;
+import org.apache.ibatis.annotations.Delete;
 
 import java.util.List;
 
@@ -37,7 +38,7 @@ public interface SysRolePermissionService extends IService<SysRolePermission> {
     /**
      * 移除角色的所有权限
      */
-    boolean removeRolePermissions(Long roleId);
+    boolean removeRolePermissions(Long roleId) throws Exception;
 
     /**
      * 移除权限的所有角色

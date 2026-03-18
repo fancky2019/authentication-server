@@ -138,15 +138,12 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
             return true;
         }
         // 删除用户原有的角色关联
-//        userRoleMapper.deleteByUserId(userId);
         List<SysUserRole> userRoleList = getUserRoles(userId);
         if (CollectionUtils.isNotEmpty(userRoleList)) {
-            List<Long> roleIdList = userRoleList.stream().map(p -> p.getRoleId()).collect(Collectors.toList());
-            this.rolePermissionService.removeByIds(roleIdList);
+            List<Long> userRoleIdList = userRoleList.stream().map(p -> p.getId()).collect(Collectors.toList());
+            this.removeByIds(userRoleIdList);
         }
 
-        List<Long> userRoleIdList = userRoleList.stream().map(p -> p.getId()).collect(Collectors.toList());
-        this.removeByIds(userRoleIdList);
 
 
         // 创建新的角色关联

@@ -37,7 +37,7 @@ public class SysUserRoleController {
     }
 
     /**
-     * 为用户分配角色
+     * 为用户分配角色(新增、编辑)
      */
     @PostMapping("/assign-to-user")
     public MessageResult<String> assignRolesToUser(@RequestParam Long userId, @RequestBody List<Long> roleIds) throws Exception {
@@ -45,14 +45,14 @@ public class SysUserRoleController {
         return MessageResult.success("角色分配成功");
     }
 
-    /**
-     * 为角色分配用户
-     */
-    @PostMapping("/assign-to-role")
-    public MessageResult<String> assignUsersToRole(@RequestParam Long roleId, @RequestBody List<Long> userIds) {
-        userRoleService.assignUsersToRole(roleId, userIds);
-        return MessageResult.success("用户分配成功");
-    }
+//    /**
+//     * 为角色分配用户
+//     */
+//    @PostMapping("/assign-to-role")
+//    public MessageResult<String> assignUsersToRole(@RequestParam Long roleId, @RequestBody List<Long> userIds) {
+//        userRoleService.assignUsersToRole(roleId, userIds);
+//        return MessageResult.success("用户分配成功");
+//    }
 
     /**
      * 移除用户的某个角色
