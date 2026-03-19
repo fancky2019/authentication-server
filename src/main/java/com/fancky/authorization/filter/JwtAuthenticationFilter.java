@@ -158,11 +158,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     return;
                 }
                 String superAdmin = "ROLE_SUPER_ADMIN";
-
-
                 List<Long> roleIdList = userRoles.stream().map(p -> p.getRoleId()).distinct().collect(Collectors.toList());
-
-
                 List<SysRole> sysRoleList = this.sysRoleService.getRoleByIds(roleIdList);
                 List<String> sysRoleCodeList = sysRoleList.stream().map(p -> p.getRoleCode()).distinct().collect(Collectors.toList());
                 if (sysRoleCodeList.contains(superAdmin)) {

@@ -36,7 +36,7 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         try {
             user = sysUserService.getUserWithRolesAndPermissions(username);
         } catch (Exception e) {
-            throw new UsernameNotFoundException("用户不存在: " + username);
+            throw new UsernameNotFoundException("获取用户信息异常: " + username);
         }
 
         if (user == null) {

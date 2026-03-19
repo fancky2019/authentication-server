@@ -222,7 +222,7 @@ public class UserController {
     /**
      * 修改用户
      */
-    @PutMapping
+    @PutMapping("/update")
     public MessageResult<Void> update(@Valid @RequestBody UserDTO userDTO) throws Exception {
         userService.updateUser(userDTO);
         return MessageResult.success();
@@ -232,7 +232,7 @@ public class UserController {
      * 删除用户
      */
     @DeleteMapping("/{id}")
-    public MessageResult<Void> delete(@PathVariable Long id) {
+    public MessageResult<Void> delete(@PathVariable Long id) throws Exception {
         userService.deleteUser(id);
         return MessageResult.success();
     }
@@ -241,7 +241,7 @@ public class UserController {
      * 批量删除用户
      */
     @DeleteMapping("/batch")
-    public MessageResult<Void> deleteBatch(@RequestBody Long[] ids) {
+    public MessageResult<Void> deleteBatch(@RequestBody Long[] ids) throws Exception {
         userService.deleteBatch(ids);
         return MessageResult.success();
     }

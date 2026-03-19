@@ -67,8 +67,8 @@ public class SysUserRoleController {
      * 移除用户的所有角色
      */
     @DeleteMapping("/user/{userId}/remove-all")
-    public MessageResult<String> removeUserRoles(@PathVariable Long userId) {
-        userRoleService.removeUserRoles(userId);
+    public MessageResult<String> removeUserRoles(@PathVariable Long userId) throws Exception {
+        userRoleService.removeByUser(userId);
         return MessageResult.success("所有角色移除成功");
     }
 

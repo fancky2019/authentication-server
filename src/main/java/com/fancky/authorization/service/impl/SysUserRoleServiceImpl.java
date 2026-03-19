@@ -50,27 +50,6 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
 
     @Autowired
     private SysRolePermissionService rolePermissionService;
-
-    @Override
-    public List<Long> getRoleIdsByUserId(Long userId) {
-        return userRoleMapper.selectRoleIdsByUserId(userId);
-    }
-
-    @Override
-    public List<Long> getUserIdsByRoleId(Long roleId) {
-        return userRoleMapper.selectUserIdsByRoleId(roleId);
-    }
-
-    @Override
-    public List<SysUserRole> getByRoleId(Long roleId) {
-        if (roleId == null || roleId <= 0) {
-            return null;
-        }
-        LambdaQueryWrapper<SysUserRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
-        lambdaQueryWrapper.eq(SysUserRole::getRoleId, roleId);
-        return this.list(lambdaQueryWrapper);
-    }
-
     @Override
     public void initUserRole() {
 //        log.info("start init UserRole");
@@ -139,6 +118,84 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
         log.info("init SysUserRole complete, total records: {}, cost: {}ms",
                 list.size(), cost);
     }
+
+    @Override
+    public List<Long> getRoleIdsByUserId(Long userId) {
+        return userRoleMapper.selectRoleIdsByUserId(userId);
+    }
+
+    @Override
+    public List<Long> getUserIdsByRoleId(Long roleId) {
+        return userRoleMapper.selectUserIdsByRoleId(roleId);
+    }
+
+    @Override
+    public List<SysUserRole> getByRoleId(Long roleId) {
+        if (roleId == null || roleId <= 0) {
+            return null;
+        }
+        LambdaQueryWrapper<SysUserRole> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+        lambdaQueryWrapper.eq(SysUserRole::getRoleId, roleId);
+        return this.list(lambdaQueryWrapper);
+    }
+    @Override
+    public List<SysUserRole> getByUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            return Collections.emptyList();
+        }
+//        LambdaQueryWrapper<SysRolePermission> lambdaQueryWrapper = new LambdaQueryWrapper<>();
+//        lambdaQueryWrapper.in(SysRolePermission::getRoleId, roleIdList);
+//        return this.list(lambdaQueryWrapper);
+
+
+        // 此处保存的是set  ,通用保存的是hashmap.
+
+        List<Long> userIdList = Arrays.asList(userId);
+        try {
+            // 1. 批量查询
+            List<SysUserRole> dataList = redisCacheService.<SysUserRole, Long>listBatchBuilder()
+                    .cache(RedisKey.USER_ROLE_USER_KEY, userIdList)
+                    .db(
+                            missIds -> {
+                                // 分批查询数据库
+                                LambdaQueryWrapper<SysUserRole> wrapper = new LambdaQueryWrapper<>();
+                                wrapper.in(SysUserRole::getUserId, missIds);
+                                return this.list(wrapper);
+                            },
+                            SysUserRole::getUserId,
+                            SysUserRole.class
+                    )
+                    .nullCache(RedisKey.USER_ROLE_USER_NULL_KEY)
+//                    .nullCacheTimeout(30, TimeUnit.MINUTES)
+//                    .withDbBatchSize(100)
+//                    .enableMetrics(true)
+                    .returnEmptyList(true)  // 没有权限时返回空List而不是null
+                    .execute();
+
+            // 2. 检查结果（只检查传入的ID是否都有返回）
+            Set<Long> foundIds = dataList.stream()
+                    .filter(Objects::nonNull)
+                    .map(SysUserRole::getRoleId)
+                    .collect(Collectors.toSet());
+
+            List<Long> notFoundIds = userIdList.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!notFoundIds.isEmpty()) {
+                log.warn("Some SysUserRole ids not found: {}", StringUtils.join(notFoundIds, ","));
+                // 根据业务需求决定是否抛异常
+                // throw new Exception("Can't get role info for ids: " + notFoundIds);
+            }
+
+            return dataList;
+
+        } catch (Exception e) {
+            log.error("Failed to get SysUserRole by ids: {}", StringUtils.join(userIdList, ","), e);
+            throw new RuntimeException("Failed to get SysUserRole by ids", e);
+        }
+    }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -219,10 +276,16 @@ public class SysUserRoleServiceImpl extends ServiceImpl<SysUserRoleMapper, SysUs
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean removeUserRoles(Long userId) {
-        return remove(new LambdaQueryWrapper<SysUserRole>()
-                .eq(SysUserRole::getUserId, userId));
+    public boolean removeByUser(Long userId) throws Exception {
+//        return remove(new LambdaQueryWrapper<SysUserRole>()
+//                .eq(SysUserRole::getUserId, userId));
+
+        List<SysUserRole> sysUserRoleList = this.getByUserId(userId);
+        List<Long> idList = sysUserRoleList.stream().map(p -> p.getId()).collect(Collectors.toList());
+        return deleteBatch(idList);
+
     }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)

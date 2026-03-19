@@ -3,6 +3,7 @@ package com.fancky.authorization.model.entity;
 
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.*;
@@ -21,7 +22,8 @@ import java.util.List;
 public class SysUser extends BaseEntity implements UserDetails {
     //    @TableField("role_code")
     private String username;
-
+//    @TableLogic
+//    private Integer deleted;
     //    @JsonIgnore
     private String password;
 

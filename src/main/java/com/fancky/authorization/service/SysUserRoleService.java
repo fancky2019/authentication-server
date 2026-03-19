@@ -19,6 +19,8 @@ public interface SysUserRoleService extends IService<SysUserRole> {
     List<Long> getUserIdsByRoleId(Long roleId);
 
     List<SysUserRole> getByRoleId(Long roleId);
+
+    List<SysUserRole> getByUserId(Long userId);
     /**
      * 为用户分配角色
      */
@@ -37,7 +39,7 @@ public interface SysUserRoleService extends IService<SysUserRole> {
     /**
      * 移除用户的所有角色
      */
-    boolean removeUserRoles(Long userId);
+    boolean removeByUser(Long userId) throws Exception;
 
     /**
      * 移除角色的所有用户

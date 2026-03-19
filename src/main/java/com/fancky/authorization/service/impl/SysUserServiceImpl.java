@@ -316,18 +316,38 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deleteUser(Long id) {
-        // 删除用户角色关联
-        userRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
-                .eq(SysUserRole::getUserId, id));
-
-        // 删除用户
-        return sysUserMapper.deleteById(id) > 0;
+    public boolean deleteUser(Long id) throws Exception {
+        if (id == null || id <= 0) {
+            return false;
+        }
+        this.sysUserRoleService.removeByUser(id);
+        this.redisTemplate.opsForHash().delete(RedisKey.USER_KEY, id.toString());
+        this.removeById(id);
+        boolean success = this.removeById(id);
+        if (success) {
+            // 3. 注册事务回调 - 方式1：链式调用
+            callbackManager.register()
+//                .releaseLock(lock, lockSuccessfully)
+                    //此处优化成 删除 角色key
+//                    .deleteCache(RedisKey.ROLE_PERMISSION_KEY, RedisKey.ROLE_PERMISSION_ROLE_KEY)
+                    .onCommit(() -> {
+                        // 事务提交后，可以发送MQ消息通知其他服务
+                        // log.info("Permission added, sending notification...");
+                        // sendPermissionChangeNotification();
+                        this.redisTemplate.opsForHash().delete(RedisKey.USER_KEY, id.toString());
+                    })
+                    .onRollback(() -> {
+                        // 事务回滚后，可以做些补偿操作
+                        // log.warn("Permission addition rolled back");
+                    })
+                    .execute();
+        }
+        return success;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public boolean deleteBatch(Long[] ids) {
+    public boolean deleteBatch(Long[] ids) throws Exception {
         for (Long id : ids) {
             deleteUser(id);
         }

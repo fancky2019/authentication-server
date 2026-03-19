@@ -51,12 +51,12 @@ public interface SysUserService extends IService<SysUser> {
     /**
      * 删除用户
      */
-    boolean deleteUser(Long id);
+    boolean deleteUser(Long id) throws Exception;
 
     /**
      * 批量删除用户
      */
-    boolean deleteBatch(Long[] ids);
+    boolean deleteBatch(Long[] ids) throws Exception;
 
     /**
      * 更新用户状态
