@@ -439,3 +439,14 @@ select  *  from  sys_role
 select  *  from  sys_permission
 select  *  from  sys_role_permission
 select  *  from sys_user
+
+select
+-- u.* ,
+ur.role_id,
+p.*
+from  sys_user u
+          join sys_user_role ur on u.id=ur.user_id
+          join sys_role_permission rp on ur.role_id=rp.role_id
+          join sys_permission p on rp.permission_id=p.id
+where  1=1
+  and  u.username='user'
