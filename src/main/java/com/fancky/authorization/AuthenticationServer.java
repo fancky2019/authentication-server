@@ -3,6 +3,12 @@ package com.fancky.authorization;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+/**
+ * 理论上sso 只负责认证
+ *
+ * 授权放在业务系统，每个业务系统有独立的rbac
+ * 菜单权限、按钮权限、部门权限和租户数据权限。
+ */
 @SpringBootApplication
 public class AuthenticationServer {
  //在网关设计认证：网关作为oauth2 client  + sso server 处理，授权不在sso,授权设计在具体的资源服务中
