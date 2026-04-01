@@ -512,11 +512,46 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new RuntimeException("新密码与确认密码不一致");
         }
 
+        if (checkComplexity(newPassword)) {
+            new RuntimeException("密码包含数字大小写字母及特殊字符至少10位,如Aa1234567!");
+        }
         String encodedNewPassword = passwordEncoder.encode(newPassword);
+
         int rows = sysUserMapper.updatePassword(username, encodedNewPassword);
 
         return rows > 0;
     }
+
+    /**
+     * 检查密码是否符合复杂度要求
+     */
+    public boolean checkComplexity(String password) {
+        // 长度不少于10位
+        if (password.length() < 10) return false;
+
+        // 包含大写字母
+        if (!password.matches(".*[A-Z].*")) return false;
+
+        // 包含小写字母
+        if (!password.matches(".*[a-z].*")) return false;
+
+        // 包含数字
+        if (!password.matches(".*\\d.*")) return false;
+
+        // 包含特殊字符
+        if (!password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{}|;:,.<>?].*")) return false;
+
+        return true;
+    }
+
+    /**
+     * 检查密码是否过期
+     */
+    public boolean isPasswordExpired(LocalDateTime lastChangeTime, Integer expireDays) {
+        if (lastChangeTime == null) return true;
+        return LocalDateTime.now().isAfter(lastChangeTime.plusDays(expireDays));
+    }
+
 
     @Override
     @Transactional(rollbackFor = Exception.class)

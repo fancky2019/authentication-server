@@ -18,7 +18,9 @@
         <result property="accountNonLocked" column="account_non_locked"/>
         <result property="credentialsNonExpired" column="credentials_non_expired"/>
         <result property="lastLoginTime" column="last_login_time"/>
-        <result property="deleted" column="deleted"/>
+<!--        <result property="deleted" column="deleted"/>-->
+        <result property="password_last_change_time" column="password_last_change_time"/>
+        <result property="createTime" column="password_expire_days"/>
         <result property="createBy" column="create_by"/>
         <result property="createTime" column="create_time"/>
         <result property="updateBy" column="update_by"/>

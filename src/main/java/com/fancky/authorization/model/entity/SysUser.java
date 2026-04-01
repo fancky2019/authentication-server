@@ -44,6 +44,11 @@ public class SysUser extends BaseEntity implements UserDetails {
     @TableField(exist = false)
     private List<SysDept> depts;
 
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime passwordLastChangeTime;
+    private Integer  passwordExpireDays=30;
+
+
     //不映射到表
     @TableField(exist = false)
     private List<String> roles = new ArrayList<>();

@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS sys_user (
     account_non_locked TINYINT DEFAULT 1 COMMENT '账号未锁定: 1-未锁定 0-锁定',
     credentials_non_expired TINYINT DEFAULT 1 COMMENT '密码未过期: 1-未过期 0-过期',
     last_login_time DATETIME COMMENT '最后登录时间',
-    
+    password_last_change_time datetime DEFAULT NULL COMMENT '密码最后修改时间',
+    password_expire_days int DEFAULT '30' COMMENT '密码有效期(天)',
     -- 审计字段
     deleted TINYINT DEFAULT 0 COMMENT '逻辑删除: 0-未删除 1-删除',
     delete_by VARCHAR(50) COMMENT '删除者',
